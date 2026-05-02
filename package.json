@@ -1,0 +1,32 @@
+{
+  "name": "search-image-blocker",
+  "description": "Block image/video blocks on Google search results by keyword",
+  "private": true,
+  "version": "0.0.1",
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "dev:firefox": "wxt -b firefox",
+    "build": "wxt build",
+    "build:firefox": "wxt build -b firefox",
+    "zip": "wxt zip",
+    "zip:firefox": "wxt zip -b firefox",
+    "compile": "vue-tsc --noEmit",
+    "postinstall": "wxt prepare"
+  },
+  "dependencies": {
+    "vue": "^3.5.33"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.287",
+    "@vitejs/plugin-vue": "^5.2.4",
+    "@wxt-dev/module-vue": "^1.0.3",
+    "autoprefixer": "^10.5.0",
+    "postcss": "^8.5.13",
+    "tailwindcss": "^3.4.19",
+    "typescript": "^5.9.3",
+    "vue-tsc": "^2.2.12",
+    "wxt": "^0.19.29"
+  },
+  "packageManager": "pnpm@9.12.1+sha512.e5a7e52a4183a02d5931057f7a0dbff9d5e9ce3161e33fa68ae392125b79282a8a8a470a51dfc8a0ed86221442eb2fb57019b0990ed24fab519bf0e1bc5ccfc4"
+}
