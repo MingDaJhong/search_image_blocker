@@ -63,6 +63,10 @@ function toggleExpand(id: string) {
             影片卡片
           </label>
           <label class="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 p-1.5 rounded">
+            <input v-model="settings.blockTypes.searchPreview" type="checkbox" class="accent-primary-600" />
+            搜尋建議縮圖（autocomplete）
+          </label>
+          <label class="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 p-1.5 rounded">
             <input v-model="settings.blockTypes.relatedQuestions" type="checkbox" class="accent-primary-600" />
             相關問題
           </label>

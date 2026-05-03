@@ -9,6 +9,8 @@ export interface BlocklistSettings {
     videos: boolean
     relatedQuestions: boolean
     knowledgePanel: boolean
+    /** 搜尋框 autocomplete 下拉建議裡的縮圖 */
+    searchPreview: boolean
   }
   /** 使用者自訂的觸發關鍵字 */
   keywords: string[]
@@ -101,6 +103,7 @@ export const DEFAULT_SETTINGS: BlocklistSettings = {
     videos: true,
     relatedQuestions: false,
     knowledgePanel: false,
+    searchPreview: true,
   },
   keywords: [],
   enabledCategories: ['insects'],
