@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useBlocklist } from '@/composables/useBlocklist'
+import { useBlocklist, CATEGORIES } from '@/composables/useBlocklist'
 
 const { settings, loaded, addKeyword, removeKeyword } = useBlocklist()
 const newKeyword = ref('')
+const expandedCategory = ref<string | null>(null)
 
 function handleAdd() {
   addKeyword(newKeyword.value)
   newKeyword.value = ''
+}
+
+function toggleExpand(id: string) {
+  expandedCategory.value = expandedCategory.value === id ? null : id
 }
 </script>
 
@@ -68,10 +73,53 @@ function handleAdd() {
         </div>
       </section>
 
-      <!-- 關鍵字管理 -->
+      <!-- 觸發分類 -->
+      <section class="mb-4">
+        <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
+          觸發分類
+        </h2>
+        <div class="space-y-1">
+          <div
+            v-for="cat in CATEGORIES"
+            :key="cat.id"
+            class="rounded border border-gray-200"
+          >
+            <label class="flex items-start gap-2 text-sm cursor-pointer hover:bg-gray-50 p-2 rounded">
+              <input
+                v-model="settings.enabledCategories"
+                :value="cat.id"
+                type="checkbox"
+                class="mt-0.5 accent-primary-600"
+              />
+              <div class="flex-1 min-w-0">
+                <div class="font-medium">{{ cat.label }}</div>
+                <div class="text-xs text-gray-500">
+                  {{ cat.description }}
+                  ·
+                  <button
+                    type="button"
+                    class="text-primary-600 hover:underline"
+                    @click.prevent="toggleExpand(cat.id)"
+                  >
+                    {{ expandedCategory === cat.id ? '收合' : `${cat.keywords.length} 個關鍵字` }}
+                  </button>
+                </div>
+                <div
+                  v-if="expandedCategory === cat.id"
+                  class="mt-1.5 text-xs text-gray-600 leading-relaxed"
+                >
+                  {{ cat.keywords.join('、') }}
+                </div>
+              </div>
+            </label>
+          </div>
+        </div>
+      </section>
+
+      <!-- 自訂關鍵字 -->
       <section>
         <h2 class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
-          觸發關鍵字
+          自訂關鍵字
         </h2>
 
         <form class="flex gap-2 mb-2" @submit.prevent="handleAdd">

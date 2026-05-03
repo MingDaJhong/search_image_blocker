@@ -55,12 +55,19 @@ function applyBlockingRules(settings: BlocklistSettings, oldStyle: HTMLStyleElem
     selectors.push(
       // 圖片橫幅 / 圖片輪播
       'g-scrolling-carousel',
-      // 「圖片」分頁的圖片網格容器（保險起見）
+      // 「圖片」分頁的圖片網格容器
       'div[data-attrid*="image"]',
       // 知識面板裡的圖片
       'g-img',
-      // 結果項目中的縮圖（部分情境）
-      'div[role="heading"] ~ div img[src*="encrypted"]'
+      // 知識圖譜上方的合成大圖（昆蟲案例就是這個）
+      'div[data-attrid="kc:/local:hero image"]',
+      'div[data-attrid$="hero image"]',
+      'div[jsname="HiaYvf"]',
+      // 圖片區塊容器
+      'div[data-tts-text]',
+      // 縮圖（搜尋結果項目中的圖片）
+      '#search img',
+      '#rcnt img'
     )
   }
 
@@ -69,7 +76,11 @@ function applyBlockingRules(settings: BlocklistSettings, oldStyle: HTMLStyleElem
       // YouTube / 影片卡片
       'video-voyager',
       'div[data-attrid*="VideoObject"]',
-      'div[jsname][data-hveid] a[href*="youtube.com"]'
+      'div[jsname][data-hveid] a[href*="youtube.com"]',
+      // 影片區塊（含縮圖卡）
+      'div[data-vido]',
+      'div[jsname="UWckNb"][href*="youtube.com"]',
+      'a[href*="youtube.com/watch"]'
     )
   }
 
