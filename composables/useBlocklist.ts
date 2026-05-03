@@ -1,5 +1,8 @@
 import { ref, watch } from 'vue'
 
+export type Locale = 'zh-TW' | 'en'
+export type Theme = 'light' | 'dark'
+
 export interface BlocklistSettings {
   /** 啟用全域阻擋（不論關鍵字都隱藏） */
   globalBlock: boolean
@@ -16,12 +19,16 @@ export interface BlocklistSettings {
   keywords: string[]
   /** 已啟用的分類包 ID（對應 CATEGORIES） */
   enabledCategories: string[]
+  /** popup 顯示語系 */
+  locale: Locale
+  /** popup 主題 */
+  theme: Theme
 }
 
 export interface KeywordCategory {
   id: string
-  label: string
-  description: string
+  label: Record<Locale, string>
+  description: Record<Locale, string>
   keywords: string[]
 }
 
@@ -32,8 +39,8 @@ export interface KeywordCategory {
 export const CATEGORIES: KeywordCategory[] = [
   {
     id: 'insects',
-    label: '昆蟲 / 節肢動物',
-    description: '蟲類、蜘蛛、蜈蚣等',
+    label: { 'zh-TW': '昆蟲 / 節肢動物', en: 'Insects / Arthropods' },
+    description: { 'zh-TW': '蟲類、蜘蛛、蜈蚣等', en: 'Bugs, spiders, centipedes, etc.' },
     keywords: [
       '昆蟲', '蟲', '蝴蝶', '蛾', '飛蛾',
       '蜘蛛', '蜜蜂', '黃蜂', '虎頭蜂', '胡蜂',
@@ -47,8 +54,8 @@ export const CATEGORIES: KeywordCategory[] = [
   },
   {
     id: 'reptiles',
-    label: '爬蟲 / 兩棲類',
-    description: '蛇、蜥蜴、青蛙等',
+    label: { 'zh-TW': '爬蟲 / 兩棲類', en: 'Reptiles / Amphibians' },
+    description: { 'zh-TW': '蛇、蜥蜴、青蛙等', en: 'Snakes, lizards, frogs, etc.' },
     keywords: [
       '蛇', '蟒蛇', '眼鏡蛇', '響尾蛇', '毒蛇',
       '蜥蜴', '壁虎', '變色龍', '鬣蜥',
@@ -60,8 +67,8 @@ export const CATEGORIES: KeywordCategory[] = [
   },
   {
     id: 'gore',
-    label: '血腥 / 暴力',
-    description: '血腥、屍體、戰爭等',
+    label: { 'zh-TW': '血腥 / 暴力', en: 'Gore / Violence' },
+    description: { 'zh-TW': '血腥、屍體、戰爭等', en: 'Blood, corpses, war, etc.' },
     keywords: [
       '血腥', '屍體', '屍塊', '解剖',
       '戰爭', '暴力', '兇殺', '謀殺',
@@ -71,8 +78,8 @@ export const CATEGORIES: KeywordCategory[] = [
   },
   {
     id: 'medical',
-    label: '醫療 / 傷口',
-    description: '傷口、皮膚病、手術等',
+    label: { 'zh-TW': '醫療 / 傷口', en: 'Medical / Wounds' },
+    description: { 'zh-TW': '傷口、皮膚病、手術等', en: 'Wounds, skin conditions, surgery, etc.' },
     keywords: [
       '傷口', '潰瘍', '膿', '化膿', '結痂',
       '手術', '開刀', '縫合', '注射',
@@ -84,8 +91,8 @@ export const CATEGORIES: KeywordCategory[] = [
   },
   {
     id: 'parasites',
-    label: '寄生蟲',
-    description: '寄生蟲、蟲卵、感染',
+    label: { 'zh-TW': '寄生蟲', en: 'Parasites' },
+    description: { 'zh-TW': '寄生蟲、蟲卵、感染', en: 'Parasites, eggs, infections' },
     keywords: [
       '寄生蟲', '蛔蟲', '蟯蟲', '絛蟲', '鉤蟲',
       '線蟲', '蟲卵', '幼蟲',
@@ -95,6 +102,23 @@ export const CATEGORIES: KeywordCategory[] = [
 ]
 
 const STORAGE_KEY = 'sib_settings'
+
+/**
+ * 偵測 OS 偏好的 dark/light（loadSettings 沒有儲存值時使用）。
+ * matchMedia 在 service worker 不可用，用 typeof 防呆。
+ */
+function detectDefaultTheme(): Theme {
+  if (typeof matchMedia === 'undefined') return 'light'
+  return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+}
+
+/**
+ * 偵測預設語系（瀏覽器 navigator.language 開頭含 zh 就用繁中）
+ */
+function detectDefaultLocale(): Locale {
+  if (typeof navigator === 'undefined') return 'zh-TW'
+  return navigator.language.toLowerCase().startsWith('zh') ? 'zh-TW' : 'en'
+}
 
 export const DEFAULT_SETTINGS: BlocklistSettings = {
   globalBlock: false,
@@ -107,6 +131,9 @@ export const DEFAULT_SETTINGS: BlocklistSettings = {
   },
   keywords: [],
   enabledCategories: ['insects'],
+  // 這兩個欄位的預設值在 loadSettings 動態決定，這裡的值只當作型別填補
+  locale: 'zh-TW',
+  theme: 'light',
 }
 
 /**
@@ -125,6 +152,8 @@ export async function loadSettings(): Promise<BlocklistSettings> {
       enabledCategories: Array.isArray(stored.enabledCategories)
         ? stored.enabledCategories
         : [...DEFAULT_SETTINGS.enabledCategories],
+      locale: stored.locale === 'zh-TW' || stored.locale === 'en' ? stored.locale : detectDefaultLocale(),
+      theme: stored.theme === 'light' || stored.theme === 'dark' ? stored.theme : detectDefaultTheme(),
     }
   } catch (e) {
     console.error('[SIB] Failed to load settings:', e)
