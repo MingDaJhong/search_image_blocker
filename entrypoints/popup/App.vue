@@ -92,7 +92,7 @@ function toggleLocale() {
 <template>
   <div class="bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 p-4">
     <header class="flex items-center gap-2 mb-4">
-      <img class="w-8 h-8" src="/public/icon/128.png" alt="logo">
+      <img class="w-8 h-8" src="/icon/128.png" alt="logo">
       <div class="flex-1 min-w-0">
         <h1 class="text-base font-semibold leading-tight truncate">Search Image Blocker</h1>
         <p class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ t.subtitle }}</p>
