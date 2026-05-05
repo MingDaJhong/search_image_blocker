@@ -1,27 +1,27 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" fill="none">
   <defs>
-    <!-- 遮罩，用較粗的黑色線條在山脈上挖出留白間隙 -->
+    <!-- 1 & 2 修正：微調遮罩線條起始點 (2,18) 與寬度 (14)，精準對齊紅線邊緣，解決底部凹凸問題 -->
     <mask id="mountainMask">
       <rect width="100%" height="100%" fill="white" />
-      <line x1="32" y1="45" x2="88" y2="101" stroke="black" stroke-width="11" stroke-linecap="round" />
+      <line x1="2" y1="18" x2="122" y2="138" stroke="black" stroke-width="14" stroke-linecap="round" />
     </mask>
-    <!-- 剪切路徑，精準對齊放大鏡內框，確保放大的山脈不超出去 -->
+    <!-- 保持半徑 51，確保山脈底緣無縫貼合藍線 -->
     <clipPath id="mountainClip">
-      <circle cx="63.5" cy="60.5" r="39.5" />
+      <circle cx="58" cy="58" r="51" />
     </clipPath>
   </defs>
 
   <!-- 太陽 -->
-  <circle cx="68" cy="42" r="10" fill="#FBBC04" />
+  <circle cx="66" cy="34" r="12" fill="#FBBC04" />
   
-  <!-- 山脈 (高度拉高、底部加寬，使其佔據更大面積) -->
-  <path d="M 10 110 L 42 62 L 60 78 L 80 54 L 115 110 Z" fill="#34A853" mask="url(#mountainMask)" clip-path="url(#mountainClip)" />
+  <!-- 山脈：3 修正：左峰座標調整為 (18, 47)，讓頂部更尖銳 -->
+  <path d="M -20 140 L 18 47 L 55 71 L 86 42 L 140 140 Z" fill="#34A853" mask="url(#mountainMask)" clip-path="url(#mountainClip)" />
 
-  <!-- 放大鏡 -->
-  <path d="M 34 31 A 42 42 0 0 1 93 90" stroke="#4285F4" stroke-width="5" stroke-linecap="round" />
-  <path d="M 73 101 A 42 42 0 0 1 23 51" stroke="#4285F4" stroke-width="5" stroke-linecap="round" />
-  <line x1="93" y1="90" x2="114" y2="111" stroke="#4285F4" stroke-width="5" stroke-linecap="round" />
+  <!-- 放大鏡 (藍色主體) -->
+  <path d="M 25 18 A 52 52 0 0 1 95 95" stroke="#4285F4" stroke-width="6" stroke-linecap="round" />
+  <path d="M 78 106 A 52 52 0 0 1 8 44" stroke="#4285F4" stroke-width="6" stroke-linecap="round" />
+  <line x1="95" y1="95" x2="124" y2="124" stroke="#4285F4" stroke-width="6" stroke-linecap="round" />
 
   <!-- 紅色斜線 -->
-  <line x1="32" y1="45" x2="88" y2="101" stroke="#EA4335" stroke-width="5" stroke-linecap="round" />
+  <line x1="18" y1="34" x2="82" y2="98" stroke="#EA4335" stroke-width="6" stroke-linecap="round" />
 </svg>

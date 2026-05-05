@@ -4,7 +4,7 @@
 
 需求：
   pip3 install --user Pillow
-  macOS（用內建 qlmanage 渲染 SVG，無需 cairosvg / brew）
+  macOS（用 Chrome headless 渲染 SVG，原生支援透明背景）
 
 策略：
 - 大尺寸（48 / 96 / 128）：直接渲染原始 SVG
@@ -23,6 +23,7 @@ from PIL import Image
 ICON_DIR = os.path.dirname(os.path.abspath(__file__))
 SRC = os.path.join(ICON_DIR, 'icon.svg')
 TMP = '/tmp/icon-build'
+CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome'
 SIZES = [16, 32, 48, 96, 128]
 SMALL_THRESHOLD = 32  # <= 這個尺寸套用小尺寸補強
 
@@ -57,16 +58,36 @@ def optimize_for_small(svg: str, size: int) -> str:
 
 def render(svg_text: str, size: int) -> None:
     os.makedirs(TMP, exist_ok=True)
-    tmp_svg = os.path.join(TMP, '_render.svg')
-    with open(tmp_svg, 'w') as f:
-        f.write(svg_text)
-    # 先以 4x 解析度渲染再 LANCZOS 縮放，比直接小尺寸渲染更銳利
+    # 以 256 渲染再 LANCZOS 縮放，比直接小尺寸渲染更銳利。
+    # 不能再大：Chrome headless 在 --window-size ≥ 320 時會把 SVG 內容
+    # 截在約 90% 寬高（已實測），所以固定上限 256。
+    render_size = 256
+    html = (
+        '<!DOCTYPE html><html><head><style>'
+        'html,body{margin:0;padding:0;background:transparent}'
+        f'svg{{display:block;width:{render_size}px;height:{render_size}px}}'
+        '</style></head><body>'
+        f'{svg_text}'
+        '</body></html>'
+    )
+    tmp_html = os.path.join(TMP, '_render.html')
+    with open(tmp_html, 'w') as f:
+        f.write(html)
+    raw = os.path.join(TMP, '_shot.png')
     subprocess.run(
-        ['qlmanage', '-t', '-s', str(max(size * 4, 256)), '-o', TMP, tmp_svg],
+        [
+            CHROME,
+            '--headless',
+            '--disable-gpu',
+            '--hide-scrollbars',
+            '--default-background-color=00000000',
+            f'--screenshot={raw}',
+            f'--window-size={render_size},{render_size}',
+            f'file://{tmp_html}',
+        ],
         capture_output=True,
         check=True,
     )
-    raw = tmp_svg + '.png'
     out = os.path.join(ICON_DIR, f'{size}.png')
     Image.open(raw).convert('RGBA').resize((size, size), Image.LANCZOS).save(
         out, optimize=True
