@@ -1,10 +1,45 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useBlocklist, CATEGORIES, type Locale } from '@/composables/useBlocklist'
+import draggable from 'vuedraggable'
+import {
+  useBlocklist,
+  CATEGORIES,
+  type Locale,
+  type KeywordCategory,
+} from '@/composables/useBlocklist'
 
 const { settings, loaded, addKeyword, removeKeyword } = useBlocklist()
 const newKeyword = ref('')
 const expandedCategory = ref<string | null>(null)
+
+/**
+ * 把 settings.categoryOrder（ID 陣列）映射成完整 KeywordCategory[]，
+ * 並提供 setter — 拖曳完 vuedraggable 會把新順序的 KeywordCategory[] 寫回，
+ * 我們轉成 ID 陣列存回 settings，下游 watch 會 saveSettings。
+ *
+ * get 內也容錯：若 categoryOrder 因為某些原因漏掉新 CATEGORIES，會把缺的補在最後。
+ */
+const orderedCategories = computed<KeywordCategory[]>({
+  get() {
+    const order = settings.value.categoryOrder ?? []
+    const result: KeywordCategory[] = []
+    const seen = new Set<string>()
+    for (const id of order) {
+      const cat = CATEGORIES.find((c) => c.id === id)
+      if (cat) {
+        result.push(cat)
+        seen.add(id)
+      }
+    }
+    for (const cat of CATEGORIES) {
+      if (!seen.has(cat.id)) result.push(cat)
+    }
+    return result
+  },
+  set(val) {
+    settings.value.categoryOrder = val.map((c) => c.id)
+  },
+})
 
 // i18n 字串表 — 加新字串就在這兩邊各補一筆
 const messages = {
@@ -31,6 +66,7 @@ const messages = {
     keywordSep: '、',
     themeToggleAria: '切換主題',
     localeToggleAria: '切換語言',
+    dragHandleAria: '拖曳排序',
   },
   en: {
     subtitle: 'Hide visual clutter from Google Search',
@@ -55,6 +91,7 @@ const messages = {
     keywordSep: ', ',
     themeToggleAria: 'Toggle theme',
     localeToggleAria: 'Toggle language',
+    dragHandleAria: 'Drag to reorder',
   },
 } as const
 
@@ -173,42 +210,64 @@ function toggleLocale() {
         <h2 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2">
           {{ t.categoriesTitle }}
         </h2>
-        <div class="space-y-1">
-          <div
-            v-for="cat in CATEGORIES"
-            :key="cat.id"
-            class="rounded border border-gray-200 dark:border-gray-700"
-          >
-            <label class="flex items-start gap-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-2 rounded">
-              <input
-                v-model="settings.enabledCategories"
-                :value="cat.id"
-                type="checkbox"
-                class="mt-0.5 accent-primary-600"
-              />
-              <div class="flex-1 min-w-0">
-                <div class="font-medium">{{ cat.label[settings.locale] }}</div>
-                <div class="text-xs text-gray-500 dark:text-gray-400">
-                  {{ cat.description[settings.locale] }}
-                  ·
-                  <button
-                    type="button"
-                    class="text-primary-600 dark:text-primary-400 hover:underline"
-                    @click.prevent="toggleExpand(cat.id)"
+        <draggable
+          v-model="orderedCategories"
+          :item-key="(c: KeywordCategory) => c.id"
+          handle=".drag-handle"
+          ghost-class="sib-drag-ghost"
+          chosen-class="sib-drag-chosen"
+          animation="160"
+          class="space-y-1"
+          tag="div"
+        >
+          <template #item="{ element: cat }">
+            <div class="rounded border border-gray-200 dark:border-gray-700 flex items-stretch bg-white dark:bg-gray-900">
+              <label class="flex items-start gap-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-2 rounded-l flex-1 min-w-0">
+                <input
+                  v-model="settings.enabledCategories"
+                  :value="cat.id"
+                  type="checkbox"
+                  class="mt-0.5 accent-primary-600"
+                />
+                <div class="flex-1 min-w-0">
+                  <div class="font-medium">{{ cat.label[settings.locale] }}</div>
+                  <div class="text-xs text-gray-500 dark:text-gray-400">
+                    {{ cat.description[settings.locale] }}
+                    ·
+                    <button
+                      type="button"
+                      class="text-primary-600 dark:text-primary-400 hover:underline"
+                      @click.prevent="toggleExpand(cat.id)"
+                    >
+                      {{ expandedCategory === cat.id ? t.collapse : t.keywordCount(cat.keywords.length) }}
+                    </button>
+                  </div>
+                  <div
+                    v-if="expandedCategory === cat.id"
+                    class="mt-1.5 text-xs text-gray-600 dark:text-gray-300 leading-relaxed"
                   >
-                    {{ expandedCategory === cat.id ? t.collapse : t.keywordCount(cat.keywords.length) }}
-                  </button>
+                    {{ cat.keywords.join(t.keywordSep) }}
+                  </div>
                 </div>
-                <div
-                  v-if="expandedCategory === cat.id"
-                  class="mt-1.5 text-xs text-gray-600 dark:text-gray-300 leading-relaxed"
-                >
-                  {{ cat.keywords.join(t.keywordSep) }}
-                </div>
+              </label>
+              <div
+                class="drag-handle px-2 flex items-center cursor-grab active:cursor-grabbing text-gray-300 hover:text-gray-500 dark:text-gray-600 dark:hover:text-gray-300 select-none touch-none"
+                :title="t.dragHandleAria"
+                :aria-label="t.dragHandleAria"
+              >
+                <!-- 6 點 grip 圖示 -->
+                <svg viewBox="0 0 16 16" class="w-3.5 h-4 fill-current" aria-hidden="true">
+                  <circle cx="6" cy="3" r="1.4" />
+                  <circle cx="10" cy="3" r="1.4" />
+                  <circle cx="6" cy="8" r="1.4" />
+                  <circle cx="10" cy="8" r="1.4" />
+                  <circle cx="6" cy="13" r="1.4" />
+                  <circle cx="10" cy="13" r="1.4" />
+                </svg>
               </div>
-            </label>
-          </div>
-        </div>
+            </div>
+          </template>
+        </draggable>
       </section>
 
       <!-- 自訂關鍵字 -->

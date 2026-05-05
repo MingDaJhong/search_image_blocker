@@ -15,7 +15,8 @@
     "postinstall": "wxt prepare"
   },
   "dependencies": {
-    "vue": "^3.5.33"
+    "vue": "^3.5.33",
+    "vuedraggable": "^4.1.0"
   },
   "devDependencies": {
     "@types/chrome": "^0.0.287",

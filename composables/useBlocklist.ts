@@ -19,6 +19,8 @@ export interface BlocklistSettings {
   keywords: string[]
   /** 已啟用的分類包 ID（對應 CATEGORIES） */
   enabledCategories: string[]
+  /** 分類包顯示順序（ID 陣列，可被使用者拖曳改變） */
+  categoryOrder: string[]
   /** popup 顯示語系 */
   locale: Locale
   /** popup 主題 */
@@ -131,9 +133,28 @@ export const DEFAULT_SETTINGS: BlocklistSettings = {
   },
   keywords: [],
   enabledCategories: ['insects'],
+  categoryOrder: CATEGORIES.map((c) => c.id),
   // 這兩個欄位的預設值在 loadSettings 動態決定，這裡的值只當作型別填補
   locale: 'zh-TW',
   theme: 'light',
+}
+
+/**
+ * 把 stored 的順序與目前 CATEGORIES 對齊：
+ * - 過濾掉已不存在的 ID（CATEGORIES 拿掉某分類時）
+ * - 把新出現的 ID 補在最後（CATEGORIES 新增分類時）
+ * 確保 categoryOrder 永遠剛好等於現存所有 category id 的某個 permutation。
+ */
+function normalizeCategoryOrder(stored: unknown): string[] {
+  const allIds = CATEGORIES.map((c) => c.id)
+  const fromStored = Array.isArray(stored)
+    ? stored.filter((s): s is string => typeof s === 'string' && allIds.includes(s))
+    : []
+  const seen = new Set(fromStored)
+  for (const id of allIds) {
+    if (!seen.has(id)) fromStored.push(id)
+  }
+  return fromStored
 }
 
 /**
@@ -152,12 +173,18 @@ export async function loadSettings(): Promise<BlocklistSettings> {
       enabledCategories: Array.isArray(stored.enabledCategories)
         ? stored.enabledCategories
         : [...DEFAULT_SETTINGS.enabledCategories],
+      categoryOrder: normalizeCategoryOrder(stored.categoryOrder),
       locale: stored.locale === 'zh-TW' || stored.locale === 'en' ? stored.locale : detectDefaultLocale(),
       theme: stored.theme === 'light' || stored.theme === 'dark' ? stored.theme : detectDefaultTheme(),
     }
   } catch (e) {
     console.error('[SIB] Failed to load settings:', e)
-    return { ...DEFAULT_SETTINGS, keywords: [...DEFAULT_SETTINGS.keywords], enabledCategories: [...DEFAULT_SETTINGS.enabledCategories] }
+    return {
+      ...DEFAULT_SETTINGS,
+      keywords: [...DEFAULT_SETTINGS.keywords],
+      enabledCategories: [...DEFAULT_SETTINGS.enabledCategories],
+      categoryOrder: [...DEFAULT_SETTINGS.categoryOrder],
+    }
   }
 }
 
@@ -181,6 +208,7 @@ export function useBlocklist() {
     blockTypes: { ...DEFAULT_SETTINGS.blockTypes },
     keywords: [...DEFAULT_SETTINGS.keywords],
     enabledCategories: [...DEFAULT_SETTINGS.enabledCategories],
+    categoryOrder: [...DEFAULT_SETTINGS.categoryOrder],
   })
   const loaded = ref(false)
 
