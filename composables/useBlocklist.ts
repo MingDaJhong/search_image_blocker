@@ -21,10 +21,21 @@ export interface BlocklistSettings {
   enabledCategories: string[]
   /** 分類包顯示順序（ID 陣列，可被使用者拖曳改變） */
   categoryOrder: string[]
+  /**
+   * 使用者對 CATEGORIES 的覆蓋。key 是 category id。
+   * - label 一旦設定就忽略 locale（使用者是針對自己的語境改的）。
+   * - keywords 若存在就完全取代預設 keywords。
+   */
+  categoryOverrides: Record<string, CategoryOverride>
   /** popup 顯示語系 */
   locale: Locale
   /** popup 主題 */
   theme: Theme
+}
+
+export interface CategoryOverride {
+  label?: string
+  keywords?: string[]
 }
 
 export interface KeywordCategory {
@@ -134,6 +145,7 @@ export const DEFAULT_SETTINGS: BlocklistSettings = {
   keywords: [],
   enabledCategories: ['insects'],
   categoryOrder: CATEGORIES.map((c) => c.id),
+  categoryOverrides: {},
   // 這兩個欄位的預設值在 loadSettings 動態決定，這裡的值只當作型別填補
   locale: 'zh-TW',
   theme: 'light',
@@ -158,6 +170,26 @@ function normalizeCategoryOrder(stored: unknown): string[] {
 }
 
 /**
+ * 對 categoryOverrides 做型別防呆，並過濾不認識的 category id。
+ */
+function normalizeCategoryOverrides(stored: unknown): Record<string, CategoryOverride> {
+  const allIds = new Set(CATEGORIES.map((c) => c.id))
+  const out: Record<string, CategoryOverride> = {}
+  if (!stored || typeof stored !== 'object') return out
+  for (const [id, raw] of Object.entries(stored as Record<string, unknown>)) {
+    if (!allIds.has(id) || !raw || typeof raw !== 'object') continue
+    const r = raw as { label?: unknown; keywords?: unknown }
+    const entry: CategoryOverride = {}
+    if (typeof r.label === 'string') entry.label = r.label
+    if (Array.isArray(r.keywords)) {
+      entry.keywords = r.keywords.filter((k): k is string => typeof k === 'string')
+    }
+    if (entry.label !== undefined || entry.keywords !== undefined) out[id] = entry
+  }
+  return out
+}
+
+/**
  * 從 chrome.storage 讀取設定。
  * 對每個欄位做型別正規化 — 之前版本曾因 v-model 把 enabledCategories 寫成 boolean，
  * 這層保護同時自我修復壞資料（下一次 watch 觸發 saveSettings 就會覆蓋掉）。
@@ -174,6 +206,7 @@ export async function loadSettings(): Promise<BlocklistSettings> {
         ? stored.enabledCategories
         : [...DEFAULT_SETTINGS.enabledCategories],
       categoryOrder: normalizeCategoryOrder(stored.categoryOrder),
+      categoryOverrides: normalizeCategoryOverrides(stored.categoryOverrides),
       locale: stored.locale === 'zh-TW' || stored.locale === 'en' ? stored.locale : detectDefaultLocale(),
       theme: stored.theme === 'light' || stored.theme === 'dark' ? stored.theme : detectDefaultTheme(),
     }
@@ -184,6 +217,7 @@ export async function loadSettings(): Promise<BlocklistSettings> {
       keywords: [...DEFAULT_SETTINGS.keywords],
       enabledCategories: [...DEFAULT_SETTINGS.enabledCategories],
       categoryOrder: [...DEFAULT_SETTINGS.categoryOrder],
+      categoryOverrides: {},
     }
   }
 }
@@ -209,6 +243,7 @@ export function useBlocklist() {
     keywords: [...DEFAULT_SETTINGS.keywords],
     enabledCategories: [...DEFAULT_SETTINGS.enabledCategories],
     categoryOrder: [...DEFAULT_SETTINGS.categoryOrder],
+    categoryOverrides: {},
   })
   const loaded = ref(false)
 
@@ -236,12 +271,75 @@ export function useBlocklist() {
     settings.value.keywords = settings.value.keywords.filter((k) => k !== keyword)
   }
 
+  function ensureOverride(catId: string): CategoryOverride {
+    let entry = settings.value.categoryOverrides[catId]
+    if (!entry) {
+      entry = {}
+      settings.value.categoryOverrides[catId] = entry
+    }
+    return entry
+  }
+
+  function setCategoryLabel(catId: string, label: string) {
+    const cat = CATEGORIES.find((c) => c.id === catId)
+    if (!cat) return
+    const trimmed = label.trim()
+    const entry = ensureOverride(catId)
+    // 跟任何 locale 預設一致就移除 override（保持資料乾淨並讓未來預設更新可生效）
+    const isDefault = (Object.values(cat.label) as string[]).includes(trimmed)
+    if (!trimmed || isDefault) {
+      delete entry.label
+    } else {
+      entry.label = trimmed
+    }
+    if (entry.label === undefined && entry.keywords === undefined) {
+      delete settings.value.categoryOverrides[catId]
+    }
+  }
+
+  function addCategoryKeyword(catId: string, keyword: string) {
+    const cat = CATEGORIES.find((c) => c.id === catId)
+    if (!cat) return
+    const trimmed = keyword.trim()
+    if (!trimmed) return
+    const entry = ensureOverride(catId)
+    const list = entry.keywords ?? [...cat.keywords]
+    if (list.includes(trimmed)) return
+    list.push(trimmed)
+    entry.keywords = list
+  }
+
+  function removeCategoryKeyword(catId: string, keyword: string) {
+    const cat = CATEGORIES.find((c) => c.id === catId)
+    if (!cat) return
+    const entry = ensureOverride(catId)
+    const list = entry.keywords ?? [...cat.keywords]
+    entry.keywords = list.filter((k) => k !== keyword)
+  }
+
   return {
     settings,
     loaded,
     addKeyword,
     removeKeyword,
+    setCategoryLabel,
+    addCategoryKeyword,
+    removeCategoryKeyword,
   }
+}
+
+/**
+ * 解析分類在當前 settings/locale 下的最終 label（有 override 用 override，否則用 locale 預設）
+ */
+export function getCategoryLabel(cat: KeywordCategory, settings: BlocklistSettings): string {
+  return settings.categoryOverrides[cat.id]?.label ?? cat.label[settings.locale]
+}
+
+/**
+ * 解析分類的最終 keywords 列表（有 override 用 override，否則用預設）
+ */
+export function getCategoryKeywords(cat: KeywordCategory, settings: BlocklistSettings): string[] {
+  return settings.categoryOverrides[cat.id]?.keywords ?? cat.keywords
 }
 
 /**
@@ -254,7 +352,8 @@ export function shouldBlock(query: string, settings: BlocklistSettings): boolean
   for (const catId of settings.enabledCategories) {
     const cat = CATEGORIES.find((c) => c.id === catId)
     if (!cat) continue
-    if (cat.keywords.some((k) => lower.includes(k.toLowerCase()))) return true
+    const kws = getCategoryKeywords(cat, settings)
+    if (kws.some((k) => lower.includes(k.toLowerCase()))) return true
   }
   return false
 }
