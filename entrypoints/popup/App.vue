@@ -26,26 +26,34 @@ const newKeyword = ref("");
 const expandedCategory = ref<string | null>(null);
 
 // 目前 active tab 的搜尋字串（null = 非 Google 搜尋頁）
-const currentSearchQuery = ref<string | null>(null)
+const currentSearchQuery = ref<string | null>(null);
 // 命中的關鍵字資訊，隨 settings 變動自動更新
 const blockMatch = computed(() => {
-  const query = currentSearchQuery.value
-  if (query === null || !loaded.value) return null
-  if (!shouldBlock(query, settings.value)) return null
-  return findBlockMatch(query, settings.value)
-})
+  const query = currentSearchQuery.value;
+  if (query === null || !loaded.value) return null;
+  if (!shouldBlock(query, settings.value)) return null;
+  return findBlockMatch(query, settings.value);
+});
 
 watch(loaded, async (isLoaded) => {
-  if (!isLoaded) return
+  if (!isLoaded) return;
   try {
-    const tabs = await browser.tabs.query({ active: true, currentWindow: true })
-    const url = tabs[0]?.url ? new URL(tabs[0].url) : null
-    if (!url || !url.hostname.includes('google.com') || url.pathname !== '/search') return
-    currentSearchQuery.value = url.searchParams.get('q') ?? ''
+    const tabs = await browser.tabs.query({
+      active: true,
+      currentWindow: true,
+    });
+    const url = tabs[0]?.url ? new URL(tabs[0].url) : null;
+    if (
+      !url ||
+      !url.hostname.includes("google.com") ||
+      url.pathname !== "/search"
+    )
+      return;
+    currentSearchQuery.value = url.searchParams.get("q") ?? "";
   } catch {
     // tabs API 不可用或 URL 無法存取
   }
-})
+});
 
 // 視圖狀態：null = 主畫面；string = 該 category id 的詳情頁
 const detailCategoryId = ref<string | null>(null);
@@ -370,21 +378,21 @@ function toggleLocale() {
             class="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1.5 rounded"
           >
             <input
-              v-model="settings.blockTypes.videos"
-              type="checkbox"
-              class="accent-primary-600"
-            />
-            {{ t.blockVideos }}
-          </label>
-          <label
-            class="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1.5 rounded"
-          >
-            <input
               v-model="settings.blockTypes.searchPreview"
               type="checkbox"
               class="accent-primary-600"
             />
             {{ t.blockSearchPreview }}
+          </label>
+          <label
+            class="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1.5 rounded"
+          >
+            <input
+              v-model="settings.blockTypes.videos"
+              type="checkbox"
+              class="accent-primary-600"
+            />
+            {{ t.blockVideos }}
           </label>
           <label
             class="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1.5 rounded"
@@ -486,15 +494,20 @@ function toggleLocale() {
                   class="mt-0.5 accent-primary-600"
                 />
                 <div class="flex-1 min-w-0">
-                  <div class="font-medium">{{ cat.label }}</div>
-                  <div class="text-xs text-gray-500 dark:text-gray-400">
-                    <span v-if="cat.keywords.length > 0">
+                  <div class="font-medium truncate">{{ cat.label }}</div>
+                  <div
+                    class="text-xs text-gray-500 dark:text-gray-400 flex items-baseline gap-1 min-w-0"
+                  >
+                    <span
+                      v-if="cat.keywords.length > 0"
+                      class="truncate min-w-0"
+                    >
                       {{ cat.keywords.slice(0, 3).join(t.keywordSep)
                       }}{{ cat.keywords.length > 3 ? "…" : "" }} ·
                     </span>
                     <button
                       type="button"
-                      class="text-primary-600 dark:text-primary-400 hover:underline"
+                      class="text-primary-600 dark:text-primary-400 hover:underline shrink-0"
                       @click.prevent="toggleExpand(cat.id)"
                     >
                       {{
@@ -506,7 +519,7 @@ function toggleLocale() {
                   </div>
                   <div
                     v-if="expandedCategory === cat.id"
-                    class="mt-1.5 text-xs text-gray-600 dark:text-gray-300 leading-relaxed"
+                    class="mt-1.5 text-xs text-gray-600 dark:text-gray-300 leading-relaxed break-all"
                   >
                     {{ cat.keywords.join(t.keywordSep) }}
                   </div>
@@ -587,9 +600,9 @@ function toggleLocale() {
           <li
             v-for="kw in settings.keywords"
             :key="kw"
-            class="inline-flex items-center gap-1 px-2 py-1 bg-primary-50 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 text-xs rounded-md"
+            class="inline-flex items-center gap-1 px-2 py-1 bg-primary-50 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 text-xs rounded-md max-w-[10rem] overflow-hidden"
           >
-            <span>{{ kw }}</span>
+            <span class="truncate" :title="kw">{{ kw }}</span>
             <button
               class="hover:text-primary-900 dark:hover:text-primary-100 font-bold leading-none"
               :aria-label="t.removeAria(kw)"
@@ -697,9 +710,9 @@ function toggleLocale() {
           <li
             v-for="kw in detailKeywords"
             :key="kw"
-            class="inline-flex items-center gap-1 px-2 py-1 bg-primary-50 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 text-xs rounded-md"
+            class="inline-flex items-center gap-1 px-2 py-1 bg-primary-50 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 text-xs rounded-md max-w-[10rem] overflow-hidden"
           >
-            <span>{{ kw }}</span>
+            <span class="truncate" :title="kw">{{ kw }}</span>
             <button
               class="hover:text-primary-900 dark:hover:text-primary-100 font-bold leading-none"
               :aria-label="t.removeAria(kw)"
