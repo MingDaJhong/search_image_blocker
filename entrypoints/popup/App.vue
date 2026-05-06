@@ -1,8 +1,11 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import draggable from "vuedraggable";
+import { browser } from "wxt/browser";
 import {
   useBlockList,
+  findBlockMatch,
+  shouldBlock,
   type Locale,
   type Category,
 } from "@/composables/useBlockList";
@@ -21,6 +24,28 @@ const {
 } = useBlockList();
 const newKeyword = ref("");
 const expandedCategory = ref<string | null>(null);
+
+// 目前 active tab 的搜尋字串（null = 非 Google 搜尋頁）
+const currentSearchQuery = ref<string | null>(null)
+// 命中的關鍵字資訊，隨 settings 變動自動更新
+const blockMatch = computed(() => {
+  const query = currentSearchQuery.value
+  if (query === null || !loaded.value) return null
+  if (!shouldBlock(query, settings.value)) return null
+  return findBlockMatch(query, settings.value)
+})
+
+watch(loaded, async (isLoaded) => {
+  if (!isLoaded) return
+  try {
+    const tabs = await browser.tabs.query({ active: true, currentWindow: true })
+    const url = tabs[0]?.url ? new URL(tabs[0].url) : null
+    if (!url || !url.hostname.includes('google.com') || url.pathname !== '/search') return
+    currentSearchQuery.value = url.searchParams.get('q') ?? ''
+  } catch {
+    // tabs API 不可用或 URL 無法存取
+  }
+})
 
 // 視圖狀態：null = 主畫面；string = 該 category id 的詳情頁
 const detailCategoryId = ref<string | null>(null);
@@ -147,6 +172,12 @@ const messages = {
     newCategoryPlaceholder: "輸入分類名稱",
     deleteCategoryBtn: "刪除此分類",
     saveError: "儲存失敗：設定空間已達上限，請刪除部分分類或關鍵字。",
+    blockedByMsg: (kw: string, cat: string | null) =>
+      !kw
+        ? "目前阻擋中：全域阻擋已啟用"
+        : cat
+          ? `目前阻擋中：關鍵字「${kw}」（${cat}）`
+          : `目前阻擋中：自訂關鍵字「${kw}」`,
   },
   en: {
     subtitle: "Hide visual clutter from Google Search",
@@ -185,6 +216,12 @@ const messages = {
     deleteCategoryBtn: "Delete this category",
     saveError:
       "Save failed: storage quota exceeded. Please remove some categories or keywords.",
+    blockedByMsg: (kw: string, cat: string | null) =>
+      !kw
+        ? "Blocking active: global block is on"
+        : cat
+          ? `Blocking active: keyword "${kw}" (${cat})`
+          : `Blocking active: custom keyword "${kw}"`,
   },
 } as const;
 
@@ -284,6 +321,14 @@ function toggleLocale() {
     </div>
 
     <template v-else-if="!detailCategory">
+      <!-- 目前阻擋來源提示 -->
+      <div
+        v-if="blockMatch"
+        class="mb-4 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md text-xs text-blue-700 dark:text-blue-300"
+      >
+        {{ t.blockedByMsg(blockMatch.keyword, blockMatch.categoryLabel) }}
+      </div>
+
       <!-- 全域開關 -->
       <section
         class="mb-4 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"

@@ -429,3 +429,29 @@ export function shouldBlock(query: string, settings: BlocklistSettings): boolean
   }
   return false
 }
+
+/**
+ * 回傳第一個命中的關鍵字與其分類名稱（供 UI 顯示阻擋原因）。
+ * globalBlock 時 keyword 為空字串、categoryLabel 為 null。
+ * 自訂關鍵字命中時 categoryLabel 為 null。
+ * 未命中時回傳 null。
+ */
+export function findBlockMatch(
+  query: string,
+  settings: BlocklistSettings,
+): { keyword: string; categoryLabel: string | null } | null {
+  if (!shouldBlock(query, settings)) return null
+  if (settings.globalBlock) return { keyword: '', categoryLabel: null }
+  const lower = query.toLowerCase()
+  for (const k of settings.keywords) {
+    if (lower.includes(k.toLowerCase())) return { keyword: k, categoryLabel: null }
+  }
+  for (const catId of settings.enabledCategories) {
+    const cat = settings.customCategories.find((c) => c.id === catId)
+    if (!cat) continue
+    for (const k of cat.keywords) {
+      if (lower.includes(k.toLowerCase())) return { keyword: k, categoryLabel: cat.label }
+    }
+  }
+  return null
+}
