@@ -2,7 +2,7 @@
 
 依關鍵字隱藏 Google 搜尋頁的圖片橫幅、影片卡片等視覺干擾的 Chrome Extension。
 
-技術棧：**WXT + Vue3 + TypeScript + TailwindCSS**
+技術棧：**WXT + Vue 3 + TypeScript + TailwindCSS**
 
 ## 快速開始
 
@@ -26,15 +26,15 @@ pnpm zip
 .
 ├── entrypoints/
 │   ├── content/           # Content script（注入 google.com）
-│   │   └── index.ts       # 核心隱藏邏輯
+│   │   └── index.ts       # CSS 隱藏 + autocomplete MutationObserver
 │   └── popup/             # 點擊圖示彈出的設定頁
-│       ├── App.vue        # 主 UI（Vue3 + Tailwind）
-│       ├── main.ts
+│       ├── App.vue        # 主 UI（Vue 3 + Tailwind）
+│       ├── main.ts        # 首次渲染前同步套用 dark class（防閃爍）
 │       ├── style.css
 │       └── index.html
 ├── composables/
-│   └── useBlocklist.ts    # 共用的 chrome.storage 邏輯
-├── public/icon/           # 圖示（待補：16/32/48/96/128 px）
+│   └── useBlockList.ts    # 共用邏輯：設定型別、chrome.storage I/O、shouldBlock
+├── public/icon/           # Extension 圖示（16/32/48/96/128 px + SVG）
 ├── wxt.config.ts          # WXT 設定檔（manifest 在這）
 ├── tailwind.config.js
 └── postcss.config.js
@@ -51,29 +51,28 @@ pnpm zip
 
 - **全域阻擋**：不論搜尋什麼都隱藏圖片
 - **區塊類型**：勾選要隱藏的區塊（圖片、影片、搜尋建議縮圖、相關問題、知識面板）
-- **觸發分類**：內建策展的關鍵字包（昆蟲、爬蟲、血腥、醫療、寄生蟲），勾選即用，免手動維護
-- **自訂關鍵字**：分類包不夠用時可自己加，搜尋字串 substring 比對
+- **觸發分類**：內建 5 個策展關鍵字包（昆蟲、爬蟲、血腥、醫療、寄生蟲），勾選即用；支援拖曳排序
+- **自訂分類**：可新增、重新命名、刪除分類，並在詳情頁管理該分類的關鍵字
+- **自訂關鍵字**：全域自訂關鍵字，搜尋字串 substring 比對
+- **阻擋狀態顯示**：popup 偵測目前 active tab 的搜尋字串，顯示觸發了哪個關鍵字 / 分類
 - **autocomplete 智慧處理**：搜尋建議下拉用 MutationObserver 逐 option 評估，不會把無關的 suggestion 縮圖一起擋掉；右側知識預覽則用搜尋框輸入字 + 任一 option 命中當訊號
 - **多語系**：popup 支援繁體中文 / English 切換（首次安裝跟 `navigator.language`）
-- **深色模式**：popup 支援淺色 / 深色切換（首次安裝跟系統偏好）
+- **深色模式**：popup 支援淺色 / 深色切換（首次安裝跟系統偏好，防閃爍）
 - **設定同步**：使用 `chrome.storage.sync`，跨裝置自動同步
 
 ## TODO
 
-- [x] ~~補上 icon（16/32/48/96/128 px）放到 `public/icon/`~~
 - [ ] Google CSS 選擇器需要長期維護（Google 會定期更新 DOM 結構）
-- [x] ~~加入「分類預設關鍵字包」（昆蟲、血腥、醫療等）~~ — 已內建 5 包
 - [ ] 加入更多分類包（食物、深海生物、群聚恐懼等）
 - [ ] 加入正則表達式支援
-- [x] ~~i18n 多語系~~ — popup 已支援 zh-TW / en
 - [ ] content script 內無使用者可見字串，i18n 暫不需要；若未來加 toast / banner 再做
-- [ ] autocomplete observer 範圍可改縮到搜尋框父容器以省 DOM 監聽成本（目前監聽 documentElement，實測未發現卡頓）
+- [ ] autocomplete observer 範圍可改縮到搜尋框父容器以省 DOM 監聽成本（目前監聽 documentElement）
 - [ ] 三態主題（auto / light / dark）— 目前只有 binary
 - [ ] 上架 Chrome Web Store
 
 ## 上架前檢查清單
 
-- [ ] 完整 icon（128x128 必備）
+- [x] 完整 icon（16/32/48/96/128 px）
 - [ ] 至少一張螢幕截圖（1280x800 或 640x400）
 - [ ] 隱私權政策頁面（即使沒蒐集資料也建議寫一份）
 - [ ] 詳細描述、簡短描述、分類設定
