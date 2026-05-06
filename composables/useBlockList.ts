@@ -18,120 +18,189 @@ export interface BlocklistSettings {
   }
   /** 使用者自訂的觸發關鍵字 */
   keywords: string[]
-  /** 已啟用的分類包 ID（對應 CATEGORIES） */
+  /** 已啟用的分類包 ID */
   enabledCategories: string[]
   /** 分類包顯示順序（ID 陣列，可被使用者拖曳改變） */
   categoryOrder: string[]
-  /**
-   * 使用者對 CATEGORIES 的覆蓋。key 是 category id。
-   * - label 一旦設定就忽略 locale（使用者是針對自己的語境改的）。
-   * - keywords 若存在就完全取代預設 keywords。
-   */
-  categoryOverrides: Record<string, CategoryOverride>
+  /** 所有觸發分類（內建預設與使用者新增都存這裡，可自由刪除） */
+  customCategories: Category[]
   /** popup 顯示語系 */
   locale: Locale
   /** popup 主題 */
   theme: Theme
 }
 
-export interface CategoryOverride {
-  label?: string
-  keywords?: string[]
-}
-
-export interface KeywordCategory {
+export interface Category {
   id: string
-  label: Record<Locale, string>
-  description: Record<Locale, string>
+  label: string
   keywords: string[]
 }
 
-/**
- * 預設策展的分類包。新增分類就加在這裡，popup UI 會自動帶出。
- * 關鍵字比對是 substring（不分大小寫），所以「蟲」會命中「昆蟲」「毛毛蟲」等。
- */
-export const CATEGORIES: KeywordCategory[] = [
+/** 內建預設分類（僅作為首次安裝的 seed 資料，不作為執行時判斷依據） */
+interface DefaultCategory {
+  id: string
+  label: Record<Locale, string>
+  keywords: Record<Locale, string[]>
+}
+
+const DEFAULT_CATEGORIES: DefaultCategory[] = [
   {
     id: 'insects',
     label: { 'zh-TW': '昆蟲 / 節肢動物', en: 'Insects / Arthropods' },
-    description: { 'zh-TW': '蟲類、蜘蛛、蜈蚣等', en: 'Bugs, spiders, centipedes, etc.' },
-    keywords: [
-      '昆蟲', '蟲', '蝴蝶', '蛾', '飛蛾',
-      '蜘蛛', '蜜蜂', '黃蜂', '虎頭蜂', '胡蜂',
-      '螞蟻', '白蟻', '蟑螂', '蜈蚣', '馬陸',
-      '蠍子', '甲蟲', '瓢蟲', '蟬', '螳螂',
-      '蒼蠅', '蚊子', '跳蚤', '蝨子', '塵蟎',
-      '毛毛蟲', '蛆', '蚯蚓', '水蛭', '蝸牛', '蛞蝓',
-      'insect', 'bug', 'spider', 'cockroach', 'centipede',
-      'beetle', 'wasp', 'mosquito', 'maggot', 'larva',
-    ],
+    keywords: {
+      'zh-TW': [
+        '昆蟲', '蟲', '蝴蝶', '蛾', '飛蛾',
+        '蜘蛛', '蜜蜂', '黃蜂', '虎頭蜂', '胡蜂',
+        '螞蟻', '白蟻', '蟑螂', '蜈蚣', '馬陸',
+        '蠍子', '甲蟲', '瓢蟲', '蟬', '螳螂',
+        '蒼蠅', '蚊子', '跳蚤', '蝨子', '塵蟎',
+        '毛毛蟲', '蛆', '蚯蚓', '水蛭', '蝸牛', '蛞蝓',
+      ],
+      en: [
+        'insect', 'bug', 'spider', 'cockroach', 'centipede',
+        'beetle', 'wasp', 'mosquito', 'maggot', 'larva',
+        'butterfly', 'moth', 'bee', 'hornet', 'ant',
+        'termite', 'flea', 'louse', 'mite', 'dust mite',
+        'caterpillar', 'worm', 'earthworm', 'leech', 'snail',
+        'slug', 'scorpion', 'mantis', 'cicada', 'millipede',
+        'earwig', 'tick', 'weevil', 'locust', 'aphid',
+      ],
+    },
   },
   {
     id: 'reptiles',
     label: { 'zh-TW': '爬蟲 / 兩棲類', en: 'Reptiles / Amphibians' },
-    description: { 'zh-TW': '蛇、蜥蜴、青蛙等', en: 'Snakes, lizards, frogs, etc.' },
-    keywords: [
-      '蛇', '蟒蛇', '眼鏡蛇', '響尾蛇', '毒蛇',
-      '蜥蜴', '壁虎', '變色龍', '鬣蜥',
-      '青蛙', '蟾蜍', '蝌蚪',
-      '鱷魚', '烏龜', '甲魚',
-      'snake', 'cobra', 'python', 'lizard', 'gecko',
-      'frog', 'toad', 'crocodile',
-    ],
+    keywords: {
+      'zh-TW': [
+        '蛇', '蟒蛇', '眼鏡蛇', '響尾蛇', '毒蛇', '青竹絲', '百步蛇',
+        '蜥蜴', '壁虎', '變色龍', '鬣蜥', '科莫多龍',
+        '青蛙', '蟾蜍', '蝌蚪', '蠑螈', '山椒魚',
+        '鱷魚', '烏龜', '甲魚', '海龜',
+      ],
+      en: [
+        'snake', 'cobra', 'python', 'rattlesnake', 'viper',
+        'boa', 'mamba', 'cottonmouth', 'copperhead', 'anaconda',
+        'lizard', 'gecko', 'chameleon', 'iguana', 'komodo',
+        'frog', 'toad', 'tadpole', 'salamander', 'newt',
+        'crocodile', 'alligator', 'caiman', 'turtle', 'tortoise',
+      ],
+    },
   },
   {
     id: 'gore',
     label: { 'zh-TW': '血腥 / 暴力', en: 'Gore / Violence' },
-    description: { 'zh-TW': '血腥、屍體、戰爭等', en: 'Blood, corpses, war, etc.' },
-    keywords: [
-      '血腥', '屍體', '屍塊', '解剖',
-      '戰爭', '暴力', '兇殺', '謀殺',
-      '酷刑', '死亡', '車禍現場',
-      'gore', 'blood', 'corpse', 'autopsy', 'gruesome',
-    ],
+    keywords: {
+      'zh-TW': [
+        '血腥', '血跡', '屍體', '屍塊', '解剖', '驗屍',
+        '暴力', '兇殺', '謀殺', '虐殺', '酷刑',
+        '死亡現場', '車禍現場', '命案現場',
+        '斷肢', '截肢', '內臟', '器官摘除',
+      ],
+      en: [
+        'gore', 'gory', 'blood', 'bloody', 'corpse', 'dead body',
+        'autopsy', 'gruesome', 'mutilation', 'dismemberment',
+        'decapitation', 'beheading', 'massacre', 'carnage',
+        'torture', 'brutal', 'graphic violence', 'death scene',
+        'crime scene', 'accident scene', 'severed',
+      ],
+    },
   },
   {
     id: 'medical',
     label: { 'zh-TW': '醫療 / 傷口', en: 'Medical / Wounds' },
-    description: { 'zh-TW': '傷口、皮膚病、手術等', en: 'Wounds, skin conditions, surgery, etc.' },
-    keywords: [
-      '傷口', '潰瘍', '膿', '化膿', '結痂',
-      '手術', '開刀', '縫合', '注射',
-      '皮膚病', '濕疹', '牛皮癬', '汗皰疹', '香港腳',
-      '青春痘', '粉刺', '黑頭', '酒糟',
-      '癌症', '腫瘤', '癤瘡', '疣',
-      'wound', 'surgery', 'tumor', 'eczema', 'acne', 'rash',
-    ],
+    keywords: {
+      'zh-TW': [
+        '傷口', '潰瘍', '膿', '化膿', '膿包', '膿瘡', '結痂',
+        '手術', '開刀', '縫合', '開放性傷口',
+        '皮膚病', '濕疹', '牛皮癬', '汗皰疹', '香港腳', '癬',
+        '青春痘', '粉刺', '黑頭', '酒糟鼻',
+        '腫瘤', '癌症', '癤瘡', '疣', '肉芽',
+        '壞疽', '壞死', '潰爛', '蜂窩性組織炎',
+      ],
+      en: [
+        'wound', 'open wound', 'ulcer', 'pus', 'abscess',
+        'boil', 'cyst', 'blister', 'scab', 'gangrene',
+        'surgery', 'surgical incision', 'suture', 'stitches',
+        'skin disease', 'eczema', 'psoriasis', 'rash', 'ringworm',
+        'acne', 'pimple', 'blackhead', 'rosacea', 'wart',
+        'tumor', 'carcinoma', 'melanoma', 'necrosis', 'cellulitis',
+        'infection', 'festering', 'amputation',
+      ],
+    },
   },
   {
     id: 'parasites',
     label: { 'zh-TW': '寄生蟲', en: 'Parasites' },
-    description: { 'zh-TW': '寄生蟲、蟲卵、感染', en: 'Parasites, eggs, infections' },
-    keywords: [
-      '寄生蟲', '蛔蟲', '蟯蟲', '絛蟲', '鉤蟲',
-      '線蟲', '蟲卵', '幼蟲',
-      'parasite', 'tapeworm', 'roundworm', 'hookworm',
-    ],
+    keywords: {
+      'zh-TW': [
+        '寄生蟲', '蛔蟲', '蟯蟲', '絛蟲', '鉤蟲',
+        '線蟲', '吸蟲', '蟯蟲感染', '蟲卵', '幼蟲',
+        '疥瘡', '蠕形蟎', '弓蟲', '梨形鞭毛蟲',
+      ],
+      en: [
+        'parasite', 'tapeworm', 'roundworm', 'hookworm', 'pinworm',
+        'threadworm', 'fluke', 'nematode', 'heartworm',
+        'intestinal worm', 'parasitic infection', 'infestation',
+        'scabies', 'demodex', 'toxoplasma', 'giardia',
+        'parasite eggs', 'worm infestation',
+      ],
+    },
   },
 ]
 
 const STORAGE_KEY = 'sib_settings'
 
-/**
- * 偵測 OS 偏好的 dark/light（loadSettings 沒有儲存值時使用）。
- * matchMedia 在 service worker 不可用，用 typeof 防呆。
- */
 function detectDefaultTheme(): Theme {
   if (typeof matchMedia === 'undefined') return 'light'
   return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
 }
 
-/**
- * 偵測預設語系（瀏覽器 navigator.language 開頭含 zh 就用繁中）
- */
 function detectDefaultLocale(): Locale {
   if (typeof navigator === 'undefined') return 'zh-TW'
   return navigator.language.toLowerCase().startsWith('zh') ? 'zh-TW' : 'en'
+}
+
+/** 從 DEFAULT_CATEGORIES 依指定 locale seed 出初始 categories */
+function seedDefaultCategories(locale: Locale): Category[] {
+  return DEFAULT_CATEGORIES.map((cat) => ({
+    id: cat.id,
+    label: cat.label[locale],
+    keywords: [...cat.keywords[locale]],
+  }))
+}
+
+function normalizeCategories(stored: unknown): Category[] {
+  if (!Array.isArray(stored)) return []
+  return stored
+    .filter(
+      (c): c is Category =>
+        c !== null &&
+        typeof c === 'object' &&
+        typeof (c as Record<string, unknown>).id === 'string' &&
+        typeof (c as Record<string, unknown>).label === 'string' &&
+        Array.isArray((c as Record<string, unknown>).keywords),
+    )
+    .map((c) => ({
+      id: c.id,
+      label: c.label,
+      keywords: (c.keywords as unknown[]).filter((k): k is string => typeof k === 'string'),
+    }))
+}
+
+/**
+ * 把 stored 的順序與現有 categories 對齊：
+ * 過濾掉已刪除的 ID，把新增的補在最後。
+ */
+function normalizeCategoryOrder(stored: unknown, categoryIds: string[]): string[] {
+  const idSet = new Set(categoryIds)
+  const fromStored = Array.isArray(stored)
+    ? stored.filter((s): s is string => typeof s === 'string' && idSet.has(s))
+    : []
+  const seen = new Set(fromStored)
+  for (const id of categoryIds) {
+    if (!seen.has(id)) fromStored.push(id)
+  }
+  return fromStored
 }
 
 export const DEFAULT_SETTINGS: BlocklistSettings = {
@@ -145,42 +214,90 @@ export const DEFAULT_SETTINGS: BlocklistSettings = {
   },
   keywords: [],
   enabledCategories: ['insects'],
-  categoryOrder: CATEGORIES.map((c) => c.id),
-  categoryOverrides: {},
-  // 這兩個欄位的預設值在 loadSettings 動態決定，這裡的值只當作型別填補
+  categoryOrder: [],
+  customCategories: [],
   locale: 'zh-TW',
   theme: 'light',
 }
 
 /**
- * 把 stored 的順序與目前 CATEGORIES 對齊：
- * - 過濾掉已不存在的 ID（CATEGORIES 拿掉某分類時）
- * - 把新出現的 ID 補在最後（CATEGORIES 新增分類時）
- * 確保 categoryOrder 永遠剛好等於現存所有 category id 的某個 permutation。
+ * 從 chrome.storage 讀取設定。
+ *
+ * 首次安裝（或 customCategories 為空的舊版本遷移）時，依偵測到的 locale
+ * 從 DEFAULT_CATEGORIES seed 出初始分類。舊版 categoryOverrides 若存在也
+ * 一併套用（label/keywords 覆蓋），確保現有使用者自訂不遺失。
  */
-function normalizeCategoryOrder(stored: unknown): string[] {
-  const allIds = CATEGORIES.map((c) => c.id)
-  const fromStored = Array.isArray(stored)
-    ? stored.filter((s): s is string => typeof s === 'string' && allIds.includes(s))
-    : []
-  const seen = new Set(fromStored)
-  for (const id of allIds) {
-    if (!seen.has(id)) fromStored.push(id)
+export async function loadSettings(): Promise<BlocklistSettings> {
+  try {
+    const result = await browser.storage.sync.get(STORAGE_KEY)
+    const raw = (result[STORAGE_KEY] ?? {}) as Record<string, unknown>
+
+    const locale: Locale =
+      raw.locale === 'zh-TW' || raw.locale === 'en' ? raw.locale : detectDefaultLocale()
+
+    let categories = normalizeCategories(raw.customCategories)
+
+    if (categories.length === 0) {
+      // 首次安裝或舊版遷移：seed 預設分類並套用舊 categoryOverrides
+      const overrides = readLegacyOverrides(raw.categoryOverrides)
+      categories = seedDefaultCategories(locale).map((cat) => {
+        const ov = overrides[cat.id]
+        return {
+          id: cat.id,
+          label: ov?.label ?? cat.label,
+          keywords: ov?.keywords ?? cat.keywords,
+        }
+      })
+    }
+
+    const categoryIds = categories.map((c) => c.id)
+    const enabledCategories = Array.isArray(raw.enabledCategories)
+      ? (raw.enabledCategories as unknown[]).filter((id): id is string => typeof id === 'string')
+      : [...DEFAULT_SETTINGS.enabledCategories]
+
+    return {
+      globalBlock: typeof raw.globalBlock === 'boolean' ? raw.globalBlock : DEFAULT_SETTINGS.globalBlock,
+      blockTypes: {
+        ...DEFAULT_SETTINGS.blockTypes,
+        ...(raw.blockTypes && typeof raw.blockTypes === 'object'
+          ? (raw.blockTypes as Partial<BlocklistSettings['blockTypes']>)
+          : {}),
+      },
+      keywords: Array.isArray(raw.keywords)
+        ? (raw.keywords as unknown[]).filter((k): k is string => typeof k === 'string')
+        : [...DEFAULT_SETTINGS.keywords],
+      enabledCategories,
+      categoryOrder: normalizeCategoryOrder(raw.categoryOrder, categoryIds),
+      customCategories: categories,
+      locale,
+      theme: raw.theme === 'light' || raw.theme === 'dark' ? raw.theme : detectDefaultTheme(),
+    }
+  } catch (e) {
+    console.error('[SIB] Failed to load settings:', e)
+    const locale = detectDefaultLocale()
+    const categories = seedDefaultCategories(locale)
+    return {
+      ...DEFAULT_SETTINGS,
+      keywords: [...DEFAULT_SETTINGS.keywords],
+      enabledCategories: [...DEFAULT_SETTINGS.enabledCategories],
+      categoryOrder: categories.map((c) => c.id),
+      customCategories: categories,
+      locale,
+      theme: detectDefaultTheme(),
+    }
   }
-  return fromStored
 }
 
-/**
- * 對 categoryOverrides 做型別防呆，並過濾不認識的 category id。
- */
-function normalizeCategoryOverrides(stored: unknown): Record<string, CategoryOverride> {
-  const allIds = new Set(CATEGORIES.map((c) => c.id))
-  const out: Record<string, CategoryOverride> = {}
+/** 讀取舊版 categoryOverrides，僅用於遷移 */
+function readLegacyOverrides(
+  stored: unknown,
+): Record<string, { label?: string; keywords?: string[] }> {
+  const out: Record<string, { label?: string; keywords?: string[] }> = {}
   if (!stored || typeof stored !== 'object') return out
   for (const [id, raw] of Object.entries(stored as Record<string, unknown>)) {
-    if (!allIds.has(id) || !raw || typeof raw !== 'object') continue
+    if (!raw || typeof raw !== 'object') continue
     const r = raw as { label?: unknown; keywords?: unknown }
-    const entry: CategoryOverride = {}
+    const entry: { label?: string; keywords?: string[] } = {}
     if (typeof r.label === 'string') entry.label = r.label
     if (Array.isArray(r.keywords)) {
       entry.keywords = r.keywords.filter((k): k is string => typeof k === 'string')
@@ -191,47 +308,19 @@ function normalizeCategoryOverrides(stored: unknown): Record<string, CategoryOve
 }
 
 /**
- * 從 chrome.storage 讀取設定。
- * 對每個欄位做型別正規化 — 之前版本曾因 v-model 把 enabledCategories 寫成 boolean，
- * 這層保護同時自我修復壞資料（下一次 watch 觸發 saveSettings 就會覆蓋掉）。
- */
-export async function loadSettings(): Promise<BlocklistSettings> {
-  try {
-    const result = await browser.storage.sync.get(STORAGE_KEY)
-    const stored = (result[STORAGE_KEY] ?? {}) as Partial<BlocklistSettings>
-    return {
-      globalBlock: typeof stored.globalBlock === 'boolean' ? stored.globalBlock : DEFAULT_SETTINGS.globalBlock,
-      blockTypes: { ...DEFAULT_SETTINGS.blockTypes, ...(stored.blockTypes ?? {}) },
-      keywords: Array.isArray(stored.keywords) ? stored.keywords : [...DEFAULT_SETTINGS.keywords],
-      enabledCategories: Array.isArray(stored.enabledCategories)
-        ? stored.enabledCategories
-        : [...DEFAULT_SETTINGS.enabledCategories],
-      categoryOrder: normalizeCategoryOrder(stored.categoryOrder),
-      categoryOverrides: normalizeCategoryOverrides(stored.categoryOverrides),
-      locale: stored.locale === 'zh-TW' || stored.locale === 'en' ? stored.locale : detectDefaultLocale(),
-      theme: stored.theme === 'light' || stored.theme === 'dark' ? stored.theme : detectDefaultTheme(),
-    }
-  } catch (e) {
-    console.error('[SIB] Failed to load settings:', e)
-    return {
-      ...DEFAULT_SETTINGS,
-      keywords: [...DEFAULT_SETTINGS.keywords],
-      enabledCategories: [...DEFAULT_SETTINGS.enabledCategories],
-      categoryOrder: [...DEFAULT_SETTINGS.categoryOrder],
-      categoryOverrides: {},
-    }
-  }
-}
-
-/**
  * 儲存設定到 chrome.storage。
- * 透過 JSON 來回拆掉 Vue 的 reactive Proxy — 否則 structured clone 認不出
- * Proxy<Array>，會把陣列降級存成 `{0: ..., 1: ...}` 物件，下次 loadSettings
- * 就無法復原。
+ * 透過 JSON 來回拆掉 Vue 的 reactive Proxy，避免 structured clone 把陣列
+ * 降級成 {0:..., 1:...} 物件。
  */
-export async function saveSettings(settings: BlocklistSettings): Promise<void> {
+export async function saveSettings(settings: BlocklistSettings): Promise<boolean> {
   const plain = JSON.parse(JSON.stringify(settings)) as BlocklistSettings
-  await browser.storage.sync.set({ [STORAGE_KEY]: plain })
+  try {
+    await browser.storage.sync.set({ [STORAGE_KEY]: plain })
+    return true
+  } catch (e) {
+    console.error('[SIB] Failed to save settings (quota exceeded?):', e)
+    return false
+  }
 }
 
 /**
@@ -243,10 +332,11 @@ export function useBlockList() {
     blockTypes: { ...DEFAULT_SETTINGS.blockTypes },
     keywords: [...DEFAULT_SETTINGS.keywords],
     enabledCategories: [...DEFAULT_SETTINGS.enabledCategories],
-    categoryOrder: [...DEFAULT_SETTINGS.categoryOrder],
-    categoryOverrides: {},
+    categoryOrder: [],
+    customCategories: [],
   })
   const loaded = ref(false)
+  const saveError = ref(false)
 
   loadSettings().then((s) => {
     settings.value = s
@@ -256,9 +346,12 @@ export function useBlockList() {
   watch(
     settings,
     (val) => {
-      if (loaded.value) saveSettings(val)
+      if (!loaded.value) return
+      saveSettings(val).then((ok) => {
+        saveError.value = !ok
+      })
     },
-    { deep: true, flush: 'sync' }
+    { deep: true, flush: 'sync' },
   )
 
   function addKeyword(keyword: string) {
@@ -272,73 +365,55 @@ export function useBlockList() {
     settings.value.keywords = settings.value.keywords.filter((k) => k !== keyword)
   }
 
-  function ensureOverride(catId: string): CategoryOverride {
-    if (!settings.value.categoryOverrides[catId]) {
-      settings.value.categoryOverrides[catId] = {}
-    }
-    return settings.value.categoryOverrides[catId]
+  function addCategory(label: string): string {
+    const trimmed = label.trim()
+    if (!trimmed) return ''
+    const id = `cat_${Date.now()}`
+    settings.value.customCategories.push({ id, label: trimmed, keywords: [] })
+    settings.value.categoryOrder.push(id)
+    settings.value.enabledCategories.push(id)
+    return id
   }
 
-  function setCategoryLabel(catId: string, label: string) {
-    const cat = CATEGORIES.find((c) => c.id === catId)
+  function removeCategory(id: string) {
+    settings.value.customCategories = settings.value.customCategories.filter((c) => c.id !== id)
+    settings.value.categoryOrder = settings.value.categoryOrder.filter((i) => i !== id)
+    settings.value.enabledCategories = settings.value.enabledCategories.filter((i) => i !== id)
+  }
+
+  function setCatLabel(id: string, label: string) {
+    const cat = settings.value.customCategories.find((c) => c.id === id)
     if (!cat) return
     const trimmed = label.trim()
-    const entry = ensureOverride(catId)
-    // 跟任何 locale 預設一致就移除 override（保持資料乾淨並讓未來預設更新可生效）
-    const isDefault = (Object.values(cat.label) as string[]).includes(trimmed)
-    if (!trimmed || isDefault) {
-      delete entry.label
-    } else {
-      entry.label = trimmed
-    }
-    if (entry.label === undefined && entry.keywords === undefined) {
-      delete settings.value.categoryOverrides[catId]
-    }
+    if (trimmed) cat.label = trimmed
   }
 
-  function addCategoryKeyword(catId: string, keyword: string) {
-    const cat = CATEGORIES.find((c) => c.id === catId)
+  function addCatKeyword(id: string, keyword: string) {
+    const cat = settings.value.customCategories.find((c) => c.id === id)
     if (!cat) return
     const trimmed = keyword.trim()
-    if (!trimmed) return
-    const entry = ensureOverride(catId)
-    const list = entry.keywords ?? [...cat.keywords]
-    if (list.includes(trimmed)) return
-    list.push(trimmed)
-    entry.keywords = list
+    if (!trimmed || cat.keywords.includes(trimmed)) return
+    cat.keywords.push(trimmed)
   }
 
-  function removeCategoryKeyword(catId: string, keyword: string) {
-    const cat = CATEGORIES.find((c) => c.id === catId)
+  function removeCatKeyword(id: string, keyword: string) {
+    const cat = settings.value.customCategories.find((c) => c.id === id)
     if (!cat) return
-    const entry = ensureOverride(catId)
-    const list = entry.keywords ?? [...cat.keywords]
-    entry.keywords = list.filter((k) => k !== keyword)
+    cat.keywords = cat.keywords.filter((k) => k !== keyword)
   }
 
   return {
     settings,
     loaded,
+    saveError,
     addKeyword,
     removeKeyword,
-    setCategoryLabel,
-    addCategoryKeyword,
-    removeCategoryKeyword,
+    addCategory,
+    removeCategory,
+    setCatLabel,
+    addCatKeyword,
+    removeCatKeyword,
   }
-}
-
-/**
- * 解析分類在當前 settings/locale 下的最終 label（有 override 用 override，否則用 locale 預設）
- */
-export function getCategoryLabel(cat: KeywordCategory, settings: BlocklistSettings): string {
-  return settings.categoryOverrides[cat.id]?.label ?? cat.label[settings.locale]
-}
-
-/**
- * 解析分類的最終 keywords 列表（有 override 用 override，否則用預設）
- */
-export function getCategoryKeywords(cat: KeywordCategory, settings: BlocklistSettings): string[] {
-  return settings.categoryOverrides[cat.id]?.keywords ?? cat.keywords
 }
 
 /**
@@ -349,10 +424,8 @@ export function shouldBlock(query: string, settings: BlocklistSettings): boolean
   const lower = query.toLowerCase()
   if (settings.keywords.some((k) => lower.includes(k.toLowerCase()))) return true
   for (const catId of settings.enabledCategories) {
-    const cat = CATEGORIES.find((c) => c.id === catId)
-    if (!cat) continue
-    const kws = getCategoryKeywords(cat, settings)
-    if (kws.some((k) => lower.includes(k.toLowerCase()))) return true
+    const cat = settings.customCategories.find((c) => c.id === catId)
+    if (cat && cat.keywords.some((k) => lower.includes(k.toLowerCase()))) return true
   }
   return false
 }
