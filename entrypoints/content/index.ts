@@ -1,5 +1,5 @@
 import { defineContentScript } from 'wxt/sandbox'
-import { loadSettings, shouldBlock, type BlocklistSettings } from '@/composables/useBlocklist'
+import { loadSettings, shouldBlock, type BlocklistSettings } from '@/composables/useBlockList'
 
 export default defineContentScript({
   matches: ['https://www.google.com/search*', 'https://www.google.com.tw/search*'],

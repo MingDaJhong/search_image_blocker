@@ -2,13 +2,13 @@
 import { computed, ref, watch } from 'vue'
 import draggable from 'vuedraggable'
 import {
-  useBlocklist,
+  useBlockList,
   CATEGORIES,
   getCategoryLabel,
   getCategoryKeywords,
   type Locale,
   type KeywordCategory,
-} from '@/composables/useBlocklist'
+} from '@/composables/useBlockList'
 
 const {
   settings,
@@ -18,7 +18,7 @@ const {
   setCategoryLabel,
   addCategoryKeyword,
   removeCategoryKeyword,
-} = useBlocklist()
+} = useBlockList()
 const newKeyword = ref('')
 const expandedCategory = ref<string | null>(null)
 

@@ -1,4 +1,5 @@
 import { ref, watch } from 'vue'
+import { browser } from 'wxt/browser'
 
 export type Locale = 'zh-TW' | 'en'
 export type Theme = 'light' | 'dark'
@@ -196,7 +197,7 @@ function normalizeCategoryOverrides(stored: unknown): Record<string, CategoryOve
  */
 export async function loadSettings(): Promise<BlocklistSettings> {
   try {
-    const result = await chrome.storage.sync.get(STORAGE_KEY)
+    const result = await browser.storage.sync.get(STORAGE_KEY)
     const stored = (result[STORAGE_KEY] ?? {}) as Partial<BlocklistSettings>
     return {
       globalBlock: typeof stored.globalBlock === 'boolean' ? stored.globalBlock : DEFAULT_SETTINGS.globalBlock,
@@ -230,13 +231,13 @@ export async function loadSettings(): Promise<BlocklistSettings> {
  */
 export async function saveSettings(settings: BlocklistSettings): Promise<void> {
   const plain = JSON.parse(JSON.stringify(settings)) as BlocklistSettings
-  await chrome.storage.sync.set({ [STORAGE_KEY]: plain })
+  await browser.storage.sync.set({ [STORAGE_KEY]: plain })
 }
 
 /**
  * Vue composable：響應式設定 + 自動儲存
  */
-export function useBlocklist() {
+export function useBlockList() {
   const settings = ref<BlocklistSettings>({
     ...DEFAULT_SETTINGS,
     blockTypes: { ...DEFAULT_SETTINGS.blockTypes },
@@ -272,12 +273,10 @@ export function useBlocklist() {
   }
 
   function ensureOverride(catId: string): CategoryOverride {
-    let entry = settings.value.categoryOverrides[catId]
-    if (!entry) {
-      entry = {}
-      settings.value.categoryOverrides[catId] = entry
+    if (!settings.value.categoryOverrides[catId]) {
+      settings.value.categoryOverrides[catId] = {}
     }
-    return entry
+    return settings.value.categoryOverrides[catId]
   }
 
   function setCategoryLabel(catId: string, label: string) {
