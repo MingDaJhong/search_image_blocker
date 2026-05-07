@@ -164,6 +164,7 @@ const messages = {
     noKeywords: "尚未設定關鍵字",
     removeAria: (kw: string) => `移除 ${kw}`,
     footer: "重新整理 Google 搜尋頁以套用變更",
+    privacyPolicy: "隱私權政策",
     keywordSep: "、",
     themeToggleAria: "切換主題",
     localeToggleAria: "切換語言",
@@ -207,6 +208,7 @@ const messages = {
     noKeywords: "No custom keywords yet",
     removeAria: (kw: string) => `Remove ${kw}`,
     footer: "Reload the Google search page to apply changes",
+    privacyPolicy: "Privacy Policy",
     keywordSep: ", ",
     themeToggleAria: "Toggle theme",
     localeToggleAria: "Toggle language",
@@ -615,9 +617,17 @@ function toggleLocale() {
       </section>
 
       <footer
-        class="mt-4 pt-3 border-t border-gray-200 dark:border-gray-800 text-xs text-gray-400 dark:text-gray-500 text-center"
+        class="mt-4 pt-3 border-t border-gray-200 dark:border-gray-800 text-xs text-gray-400 dark:text-gray-500 text-center space-y-1"
       >
-        {{ t.footer }}
+        <div>{{ t.footer }}</div>
+        <div>
+          <a
+            href="/privacy.html"
+            target="_blank"
+            rel="noopener"
+            class="hover:text-gray-600 dark:hover:text-gray-300 underline underline-offset-2"
+          >{{ t.privacyPolicy }}</a>
+        </div>
       </footer>
     </template>
 

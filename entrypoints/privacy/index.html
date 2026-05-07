@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>隱私權政策 — Search Image Blocker</title>
+    <style>
+      :root {
+        --bg: #ffffff;
+        --text: #1f2937;
+        --muted: #6b7280;
+        --border: #e5e7eb;
+        --accent: #4f46e5;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #111827;
+          --text: #f3f4f6;
+          --muted: #9ca3af;
+          --border: #374151;
+          --accent: #818cf8;
+        }
+      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        background: var(--bg);
+        color: var(--text);
+        line-height: 1.7;
+        padding: 2rem 1.25rem;
+        max-width: 720px;
+        margin: 0 auto;
+      }
+      h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
+      .meta { font-size: 0.8rem; color: var(--muted); margin-bottom: 2rem; }
+      h2 { font-size: 1rem; font-weight: 600; margin: 1.75rem 0 0.5rem; }
+      p { margin-bottom: 0.75rem; font-size: 0.9375rem; }
+      hr { border: none; border-top: 1px solid var(--border); margin: 2.5rem 0; }
+      a { color: var(--accent); text-decoration: none; }
+      a:hover { text-decoration: underline; }
+      .lang { font-size: 0.75rem; color: var(--muted); margin-bottom: 0.25rem; }
+    </style>
+  </head>
+  <body>
+    <!-- 繁體中文 -->
+    <p class="lang">繁體中文</p>
+    <h1>隱私權政策</h1>
+    <p class="meta">Search Image Blocker &nbsp;·&nbsp; 最後更新：2026 年 5 月</p>
+
+    <h2>我們收集什麼資料？</h2>
+    <p>
+      本擴充功能<strong>不收集任何個人資料</strong>，也不會向任何外部伺服器傳送任何資訊。
+      所有設定（關鍵字清單、分類、封鎖類型）均儲存於您瀏覽器的
+      <code>chrome.storage.sync</code>，由 Google 跨您已登入的 Chrome 裝置同步，
+      不經過本擴充功能的伺服器。
+    </p>
+
+    <h2>我們如何使用資料？</h2>
+    <p>
+      設定資料僅用於在 Google 搜尋頁面上執行封鎖邏輯，完全在您的裝置上處理，不離開瀏覽器。
+    </p>
+
+    <h2>第三方服務</h2>
+    <p>
+      本擴充功能不整合任何分析、廣告或遙測服務。
+    </p>
+
+    <h2>權限說明</h2>
+    <p>
+      <strong>storage</strong>：用於儲存您的設定。<br />
+      <strong>主機權限（google.com、google.com.tw）</strong>：用於在 Google
+      搜尋結果頁面注入封鎖用的 CSS 規則。
+    </p>
+
+    <h2>聯絡方式</h2>
+    <p>如有隱私權相關疑問，請至
+      <a href="https://github.com/darren/search-image-blocker/issues" target="_blank" rel="noopener">
+        GitHub Issues
+      </a> 提出。
+    </p>
+
+    <hr />
+
+    <!-- English -->
+    <p class="lang">English</p>
+    <h1>Privacy Policy</h1>
+    <p class="meta">Search Image Blocker &nbsp;·&nbsp; Last updated: May 2026</p>
+
+    <h2>What data do we collect?</h2>
+    <p>
+      This extension <strong>collects no personal data</strong> and transmits nothing to any
+      external server. All settings (keyword lists, categories, block types) are stored in
+      your browser's <code>chrome.storage.sync</code>, which Google syncs across your signed-in
+      Chrome devices. This sync is handled entirely by Google and does not pass through any
+      server operated by this extension.
+    </p>
+
+    <h2>How do we use data?</h2>
+    <p>
+      Settings are used solely to run blocking logic on Google Search pages. All processing
+      happens on your device and never leaves the browser.
+    </p>
+
+    <h2>Third-party services</h2>
+    <p>
+      This extension does not integrate any analytics, advertising, or telemetry services.
+    </p>
+
+    <h2>Permissions explained</h2>
+    <p>
+      <strong>storage</strong>: to persist your settings.<br />
+      <strong>Host permissions (google.com, google.com.tw)</strong>: to inject CSS blocking
+      rules into Google Search result pages.
+    </p>
+
+    <h2>Contact</h2>
+    <p>
+      For privacy-related questions, please open an issue on
+      <a href="https://github.com/darren/search-image-blocker/issues" target="_blank" rel="noopener">
+        GitHub Issues
+      </a>.
+    </p>
+  </body>
+</html>
