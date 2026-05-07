@@ -6,6 +6,7 @@ import {
   useBlockList,
   findBlockMatch,
   shouldBlock,
+  PRESET_TEMPLATES,
   type Locale,
   type Category,
 } from "@/composables/useBlockList";
@@ -17,6 +18,7 @@ const {
   addKeyword,
   removeKeyword,
   addCategory,
+  addCategoryFromPreset,
   removeCategory,
   setCatLabel,
   addCatKeyword,
@@ -116,6 +118,25 @@ function handleAddCategory() {
   }
 }
 
+const availablePresets = computed(() => {
+  const existingIds = new Set(
+    settings.value.customCategories.map((c) => c.id),
+  );
+  const locale = settings.value.locale;
+  return PRESET_TEMPLATES.filter((p) => !existingIds.has(p.id)).map((p) => ({
+    id: p.id,
+    label: p.label[locale],
+  }));
+});
+
+function handleAddPreset(presetId: string) {
+  const id = addCategoryFromPreset(presetId);
+  if (id) {
+    showAddCategory.value = false;
+    newCategoryName.value = "";
+  }
+}
+
 /**
  * 把 settings.categoryOrder（ID 陣列）映射成 Category[]，
  * 提供 setter 供 vuedraggable 拖曳回寫。
@@ -183,6 +204,7 @@ const messages = {
     emptyCategoryKeywords: "此分類尚無關鍵字",
     addCategoryBtn: "新增分類",
     newCategoryPlaceholder: "輸入分類名稱",
+    presetsLabel: "或從範本：",
     deleteCategoryBtn: "刪除此分類",
     saveError: "儲存失敗：設定空間已達上限，請刪除部分分類或關鍵字。",
     blockedByMsg: (kw: string, cat: string | null) =>
@@ -231,6 +253,7 @@ const messages = {
     emptyCategoryKeywords: "No keywords in this category",
     addCategoryBtn: "Add category",
     newCategoryPlaceholder: "Category name",
+    presetsLabel: "Or from preset:",
     deleteCategoryBtn: "Delete this category",
     saveError:
       "Save failed: storage quota exceeded. Please remove some categories or keywords.",
@@ -539,6 +562,25 @@ const showHeaderMenu = ref(false);
             @click="showAddCategory = !showAddCategory"
           >
             + {{ t.addCategoryBtn }}
+          </button>
+        </div>
+
+        <!-- 範本快速加入 -->
+        <div
+          v-if="showAddCategory && availablePresets.length"
+          class="mb-2 flex flex-wrap items-center gap-1.5"
+        >
+          <span class="text-xs text-gray-500 dark:text-gray-400">
+            {{ t.presetsLabel }}
+          </span>
+          <button
+            v-for="p in availablePresets"
+            :key="p.id"
+            type="button"
+            class="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-800 hover:bg-primary-100 dark:hover:bg-primary-900/40 text-gray-700 dark:text-gray-300 rounded-md border border-gray-200 dark:border-gray-700"
+            @click="handleAddPreset(p.id)"
+          >
+            + {{ p.label }}
           </button>
         </div>
 

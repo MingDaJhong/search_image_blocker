@@ -91,6 +91,32 @@ const DEFAULT_CATEGORIES: DefaultCategory[] = [
     },
   },
   {
+    id: 'parasites',
+    label: { 'zh-TW': '寄生蟲', en: 'Parasites' },
+    keywords: {
+      'zh-TW': [
+        '寄生蟲', '蛔蟲', '蟯蟲', '絛蟲', '鉤蟲',
+        '線蟲', '吸蟲', '蟯蟲感染', '蟲卵', '幼蟲',
+        '疥瘡', '蠕形蟎', '弓蟲', '梨形鞭毛蟲',
+      ],
+      en: [
+        'parasite', 'tapeworm', 'roundworm', 'hookworm', 'pinworm',
+        'threadworm', 'fluke', 'nematode', 'heartworm',
+        'intestinal worm', 'parasitic infection', 'infestation',
+        'scabies', 'demodex', 'toxoplasma', 'giardia',
+        'parasite eggs', 'worm infestation',
+      ],
+    },
+  },
+]
+
+/**
+ * 預設範本：使用者可主動透過「+ 範本」按鈕加入，不會自動 seed。
+ * 移出 DEFAULT_CATEGORIES 是為了降低 Chrome Web Store 審查風險
+ * （血腥/醫療關鍵字 list 不再是首次安裝就啟用的策展內容）。
+ */
+export const PRESET_TEMPLATES: DefaultCategory[] = [
+  {
     id: 'gore',
     label: { 'zh-TW': '血腥 / 暴力', en: 'Gore / Violence' },
     keywords: {
@@ -129,24 +155,6 @@ const DEFAULT_CATEGORIES: DefaultCategory[] = [
         'acne', 'pimple', 'blackhead', 'rosacea', 'wart',
         'tumor', 'carcinoma', 'melanoma', 'necrosis', 'cellulitis',
         'infection', 'festering', 'amputation',
-      ],
-    },
-  },
-  {
-    id: 'parasites',
-    label: { 'zh-TW': '寄生蟲', en: 'Parasites' },
-    keywords: {
-      'zh-TW': [
-        '寄生蟲', '蛔蟲', '蟯蟲', '絛蟲', '鉤蟲',
-        '線蟲', '吸蟲', '蟯蟲感染', '蟲卵', '幼蟲',
-        '疥瘡', '蠕形蟎', '弓蟲', '梨形鞭毛蟲',
-      ],
-      en: [
-        'parasite', 'tapeworm', 'roundworm', 'hookworm', 'pinworm',
-        'threadworm', 'fluke', 'nematode', 'heartworm',
-        'intestinal worm', 'parasitic infection', 'infestation',
-        'scabies', 'demodex', 'toxoplasma', 'giardia',
-        'parasite eggs', 'worm infestation',
       ],
     },
   },
@@ -382,6 +390,21 @@ export function useBlockList() {
     return id
   }
 
+  function addCategoryFromPreset(presetId: string): string {
+    const preset = PRESET_TEMPLATES.find((t) => t.id === presetId)
+    if (!preset) return ''
+    if (settings.value.customCategories.some((c) => c.id === preset.id)) return preset.id
+    const locale = settings.value.locale
+    settings.value.customCategories.push({
+      id: preset.id,
+      label: preset.label[locale],
+      keywords: [...preset.keywords[locale]],
+    })
+    settings.value.categoryOrder.push(preset.id)
+    settings.value.enabledCategories.push(preset.id)
+    return preset.id
+  }
+
   function removeCategory(id: string) {
     settings.value.customCategories = settings.value.customCategories.filter((c) => c.id !== id)
     settings.value.categoryOrder = settings.value.categoryOrder.filter((i) => i !== id)
@@ -416,6 +439,7 @@ export function useBlockList() {
     addKeyword,
     removeKeyword,
     addCategory,
+    addCategoryFromPreset,
     removeCategory,
     setCatLabel,
     addCatKeyword,
