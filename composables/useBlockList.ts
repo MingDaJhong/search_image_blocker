@@ -148,7 +148,7 @@ const DEFAULT_CATEGORIES: DefaultCategory[] = [
   },
 ]
 
-const STORAGE_KEY = 'sib_settings'
+export const STORAGE_KEY = 'sib_settings'
 
 function detectDefaultTheme(): Theme {
   if (typeof matchMedia === 'undefined') return 'light'
