@@ -24,34 +24,40 @@ export default defineContentScript({
     injectInitialHideStyle();
 
     let settings = await loadSettings();
-    const blocked = shouldBlock(query, settings);
+    let autocompleteObserver: MutationObserver | null = null;
 
-    document.getElementById(INITIAL_STYLE_ID)?.remove();
-    if (blocked) {
-      console.log("[SIB] Blocking visual blocks for query:", query);
-      syncPageBlock(true, settings);
+    function applyState(s: BlocklistSettings) {
+      document.getElementById(INITIAL_STYLE_ID)?.remove();
+
+      // paused 時完整早退：不留任何 CSS 或 observer
+      if (s.paused) {
+        document.getElementById(BLOCK_STYLE_ID)?.remove();
+        autocompleteObserver?.disconnect();
+        autocompleteObserver = null;
+        clearAutocompleteStyles();
+        return;
+      }
+
+      syncPageBlock(shouldBlock(query, s), s);
+
+      if (s.blockTypes.searchPreview) {
+        if (!autocompleteObserver) {
+          autocompleteObserver = observeAutocomplete(() => settings);
+        }
+      } else {
+        autocompleteObserver?.disconnect();
+        autocompleteObserver = null;
+        clearAutocompleteStyles();
+      }
     }
 
-    // autocomplete 縮圖獨立判斷，跟 URL query 解耦
-    let autocompleteObserver: MutationObserver | null = settings.blockTypes
-      .searchPreview
-      ? observeAutocomplete(() => settings)
-      : null;
+    applyState(settings);
 
-    // 即時套用設定變更
     browser.storage.onChanged.addListener((changes, area) => {
       if (area !== "sync" || !(STORAGE_KEY in changes)) return;
       loadSettings().then((newSettings) => {
         settings = newSettings;
-        syncPageBlock(shouldBlock(query, newSettings), newSettings);
-
-        autocompleteObserver?.disconnect();
-        if (newSettings.blockTypes.searchPreview) {
-          autocompleteObserver = observeAutocomplete(() => settings);
-        } else {
-          autocompleteObserver = null;
-          clearAutocompleteStyles();
-        }
+        applyState(newSettings);
       });
     });
   },
