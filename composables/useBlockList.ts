@@ -5,6 +5,8 @@ export type Locale = 'zh-TW' | 'en'
 export type Theme = 'light' | 'dark'
 
 export interface BlocklistSettings {
+  /** 暫停所有封鎖（不改任何設定，只是暫時停用） */
+  paused: boolean
   /** 啟用全域阻擋（不論關鍵字都隱藏） */
   globalBlock: boolean
   /** 要隱藏哪些區塊類型 */
@@ -204,6 +206,7 @@ function normalizeCategoryOrder(stored: unknown, categoryIds: string[]): string[
 }
 
 export const DEFAULT_SETTINGS: BlocklistSettings = {
+  paused: false,
   globalBlock: false,
   blockTypes: {
     images: true,
@@ -256,6 +259,7 @@ export async function loadSettings(): Promise<BlocklistSettings> {
       : [...DEFAULT_SETTINGS.enabledCategories]
 
     return {
+      paused: typeof raw.paused === 'boolean' ? raw.paused : false,
       globalBlock: typeof raw.globalBlock === 'boolean' ? raw.globalBlock : DEFAULT_SETTINGS.globalBlock,
       blockTypes: {
         ...DEFAULT_SETTINGS.blockTypes,
@@ -420,6 +424,7 @@ export function useBlockList() {
  * 判斷搜尋關鍵字是否命中黑名單
  */
 export function shouldBlock(query: string, settings: BlocklistSettings): boolean {
+  if (settings.paused) return false
   if (settings.globalBlock) return true
   const lower = query.toLowerCase()
   if (settings.keywords.some((k) => lower.includes(k.toLowerCase()))) return true

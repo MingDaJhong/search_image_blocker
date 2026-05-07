@@ -163,6 +163,10 @@ const messages = {
     addBtn: "新增",
     noKeywords: "尚未設定關鍵字",
     removeAria: (kw: string) => `移除 ${kw}`,
+    menuAria: "更多選項",
+    pauseAria: "暫停封鎖",
+    resumeAria: "繼續封鎖",
+    pausedBanner: "封鎖已暫停",
     privacyPolicy: "隱私權政策",
     keywordSep: "、",
     themeToggleAria: "切換主題",
@@ -206,6 +210,10 @@ const messages = {
     addBtn: "Add",
     noKeywords: "No custom keywords yet",
     removeAria: (kw: string) => `Remove ${kw}`,
+    menuAria: "More options",
+    pauseAria: "Pause blocking",
+    resumeAria: "Resume blocking",
+    pausedBanner: "Blocking paused",
     privacyPolicy: "Privacy Policy",
     keywordSep: ", ",
     themeToggleAria: "Toggle theme",
@@ -262,6 +270,12 @@ function toggleLocale() {
   const next: Locale = settings.value.locale === "zh-TW" ? "en" : "zh-TW";
   settings.value.locale = next;
 }
+
+function togglePause() {
+  settings.value.paused = !settings.value.paused;
+}
+
+const showHeaderMenu = ref(false);
 </script>
 
 <template>
@@ -276,25 +290,61 @@ function toggleLocale() {
           {{ t.subtitle }}
         </p>
       </div>
-      <div class="flex items-center gap-1 shrink-0">
+      <div class="relative shrink-0">
         <button
           type="button"
-          :title="t.themeToggleAria"
-          :aria-label="t.themeToggleAria"
-          class="w-7 h-7 rounded hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center text-base leading-none"
-          @click="toggleTheme"
-        >
-          {{ settings.theme === "dark" ? "☀️" : "🌙" }}
-        </button>
-        <button
-          type="button"
-          :title="t.localeToggleAria"
-          :aria-label="t.localeToggleAria"
-          class="px-2 h-7 rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-xs font-semibold tabular-nums"
-          @click="toggleLocale"
-        >
-          {{ settings.locale === "zh-TW" ? "EN" : "中" }}
-        </button>
+          :title="t.menuAria"
+          :aria-label="t.menuAria"
+          :class="[
+            'w-7 h-7 rounded flex items-center justify-center text-lg leading-none font-bold tracking-tighter',
+            settings.paused
+              ? 'text-amber-500 dark:text-amber-400'
+              : 'text-gray-500 dark:text-gray-400',
+            'hover:bg-gray-100 dark:hover:bg-gray-800',
+          ]"
+          @click.stop="showHeaderMenu = !showHeaderMenu"
+        >···</button>
+
+        <template v-if="showHeaderMenu">
+          <div class="fixed inset-0 z-10" @click="showHeaderMenu = false" />
+          <div class="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden" style="min-width:11rem">
+            <button
+              type="button"
+              :class="[
+                'w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left',
+                settings.paused
+                  ? 'text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                  : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700',
+              ]"
+              @click="togglePause"
+            >
+              <svg v-if="!settings.paused" viewBox="0 0 20 20" class="w-4 h-4 fill-current shrink-0" aria-hidden="true">
+                <rect x="4" y="3" width="4" height="14" rx="1"/>
+                <rect x="12" y="3" width="4" height="14" rx="1"/>
+              </svg>
+              <svg v-else viewBox="0 0 20 20" class="w-4 h-4 fill-current shrink-0" aria-hidden="true">
+                <path d="M6 4.5a.5.5 0 0 1 .765-.424l9 5.5a.5.5 0 0 1 0 .848l-9 5.5A.5.5 0 0 1 6 15.5v-11Z"/>
+              </svg>
+              {{ settings.paused ? t.resumeAria : t.pauseAria }}
+            </button>
+            <button
+              type="button"
+              class="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+              @click="toggleTheme"
+            >
+              <span class="w-4 text-center text-base leading-none" aria-hidden="true">{{ settings.theme === "dark" ? "☀️" : "🌙" }}</span>
+              {{ t.themeToggleAria }}
+            </button>
+            <button
+              type="button"
+              class="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+              @click="toggleLocale"
+            >
+              <span class="w-4 text-center text-xs font-bold tabular-nums" aria-hidden="true">{{ settings.locale === "zh-TW" ? "EN" : "中" }}</span>
+              {{ t.localeToggleAria }}
+            </button>
+          </div>
+        </template>
       </div>
     </header>
 
@@ -329,6 +379,19 @@ function toggleLocale() {
     </div>
 
     <template v-else-if="!detailCategory">
+      <!-- 暫停 banner -->
+      <div
+        v-if="settings.paused"
+        class="mb-4 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-300 dark:border-amber-700 rounded-md text-xs text-amber-700 dark:text-amber-400 flex items-center justify-between"
+      >
+        <span>{{ t.pausedBanner }}</span>
+        <button
+          type="button"
+          class="ml-2 underline underline-offset-2 hover:no-underline shrink-0"
+          @click="togglePause"
+        >{{ t.resumeAria }}</button>
+      </div>
+
       <!-- 目前阻擋來源提示 -->
       <div
         v-if="blockMatch"
