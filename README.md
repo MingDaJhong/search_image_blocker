@@ -49,9 +49,12 @@ pnpm zip
 
 ## 功能說明
 
+- **總開關（暫停）**：popup 右上選單可一鍵暫停／繼續，content script 真正卸載 CSS 與 observer，不留任何殘餘成本
+- **設定即時生效**：修改任何選項立刻反映在現有頁面，無需重新整理
 - **全域阻擋**：不論搜尋什麼都隱藏圖片
-- **區塊類型**：勾選要隱藏的區塊（圖片、影片、搜尋建議縮圖、相關問題、知識面板）
-- **觸發分類**：內建 5 個策展關鍵字包（昆蟲、爬蟲、血腥、醫療、寄生蟲），勾選即用；支援拖曳排序
+- **區塊類型**：勾選要隱藏的區塊（圖片橫幅、搜尋結果縮圖、影片、搜尋建議縮圖、相關問題、知識面板）
+- **觸發分類**：內建 3 個策展關鍵字包預設啟用（昆蟲、爬蟲、寄生蟲），勾選即用；支援拖曳排序
+- **預設範本**：「血腥／暴力」與「醫療／傷口」改為使用者主動加入的 `+ 範本` chips，避免首次安裝就 ship 敏感關鍵字列表
 - **自訂分類**：可新增、重新命名、刪除分類，並在詳情頁管理該分類的關鍵字
 - **自訂關鍵字**：全域自訂關鍵字，搜尋字串 substring 比對
 - **阻擋狀態顯示**：popup 偵測目前 active tab 的搜尋字串，顯示觸發了哪個關鍵字 / 分類
@@ -60,20 +63,54 @@ pnpm zip
 - **深色模式**：popup 支援淺色 / 深色切換（首次安裝跟系統偏好，防閃爍）
 - **設定同步**：使用 `chrome.storage.sync`，跨裝置自動同步
 
-## TODO
+## 上架前完善計畫
 
-- [ ] Google CSS 選擇器需要長期維護（Google 會定期更新 DOM 結構）
-- [ ] 加入更多分類包（食物、深海生物、群聚恐懼等）
-- [ ] 加入正則表達式支援
-- [ ] content script 內無使用者可見字串，i18n 暫不需要；若未來加 toast / banner 再做
-- [ ] autocomplete observer 範圍可改縮到搜尋框父容器以省 DOM 監聽成本（目前監聽 documentElement）
-- [ ] 三態主題（auto / light / dark）— 目前只有 binary
-- [ ] 上架 Chrome Web Store
+依優先級排列，可逐條勾選實作。
 
-## 上架前檢查清單
+### P0 — 上架前必做
 
-- [x] 完整 icon（16/32/48/96/128 px）
+- [x] **修改設定即時生效**：content script 透過單一 `applyState()` 處理 boot 與 `browser.storage.onChanged`，動態更新 `sib-block-style` 並重新 attach / disconnect autocomplete observer；footer 不再有「需要重新整理」提示
+- [x] **總開關 / 暫停按鈕**：`BlocklistSettings.paused`，paused 時 `applyState` 早退、移除所有 CSS、disconnect observer、清掉 inline `visibility:hidden`。Popup header 選單有 toggle + 暫停 banner
+- [x] **拆分圖片相關 selector**：`blockTypes.images`（圖片橫幅）與 `blockTypes.thumbnails`（搜尋結果縮圖）已拆成兩個獨立選項
+- [x] **預設分類審查風險**：採第三選項「從程式碼移除改成『+ 範本』按鈕」— `gore`、`medical` 移到 `PRESET_TEMPLATES`，不再 auto-seed，使用者於 popup 主動加入
+- [x] **隱私權政策頁面**：`entrypoints/privacy/index.html` 已建立並由 popup footer 連結
+- [ ] **隱私權政策外部 URL**：把 `entrypoints/privacy/index.html` 內容也部署到 GitHub Pages，給 Chrome Web Store listing 填外部 URL 用
 - [ ] 至少一張螢幕截圖（1280x800 或 640x400）
-- [ ] 隱私權政策頁面（即使沒蒐集資料也建議寫一份）
-- [ ] 詳細描述、簡短描述、分類設定
+- [ ] Chrome Web Store listing：詳細描述、簡短描述、分類
 - [ ] 註冊 Chrome Web Store Developer 帳號（一次性 $5 USD）
+
+### P1 — 強烈建議
+
+- [ ] **匯入 / 匯出設定**：`JSON.stringify(settings)` 下載 + 上傳還原，讓使用者備份與跨機遷移
+- [ ] **儲存配額用量顯示**：用 `chrome.storage.sync.getBytesInUse()` 在 popup footer 顯示 `已使用 X% / 100KB`，主動預警，避免靜默爆掉才看到 `saveError`
+- [ ] **關鍵字 enable / disable**：把 `keywords: string[]` 升級為 `{ text: string, enabled: boolean }[]`，搭配 `loadSettings` 的 normalize 做舊資料遷移。**這項基本取代了 regex 的需求** — 大部分使用者真正要的不是 regex，而是「我這個關鍵字暫時不想生效」
+- [ ] **輸入驗證 + 重複回饋**：`addKeyword` / `addCategory` 加長度上限（關鍵字 50 字、分類名稱 30 字）；重複時 input 邊框閃紅 + 提示「已存在」，不要靜默忽略
+- [ ] **autocomplete observer 效能**：加 `requestAnimationFrame` 或 ~50ms throttle 合併連續 mutation；`shouldBlock` hot path 的 `k.toLowerCase()` 預先快取
+- [ ] **「還原預設分類」按鈕**：`DEFAULT_CATEGORIES` 已在程式碼中，使用者誤刪後給一鍵恢復入口
+
+### P2 — Nice to have
+
+- [ ] **搜尋頁阻擋回饋**：`browser.action.setBadgeText` 顯示阻擋數量，或頁面角落 toast「已隱藏 X 個區塊」（可關），同時方便除錯 selector 失效
+- [ ] **「精確匹配」開關**：每個關鍵字一個 ☑ 精確匹配選項，解決「蛇」誤命「蛇皮包」「蛇麼」，比 regex 友善
+- [ ] **i18n 拆檔**：`App.vue` 中的 `messages` 拆到 `composables/i18n.ts`，避免 App.vue 持續膨脹
+- [ ] **純函式測試**：vitest 加 `shouldBlock` / `findBlockMatch` / `normalizeCategoryOrder` / `readLegacyOverrides` 的回歸測試
+- [ ] **鍵盤快捷鍵**：用 manifest `commands` 欄位允許快速開啟 popup
+- [ ] **三態主題**（auto / light / dark）— 目前只有 binary
+- [ ] **autocomplete observer 範圍**縮小到搜尋框父容器，省 DOM 監聽成本（目前監聽 `documentElement`）
+
+### 安全性檢查
+
+- [x] Vue text interpolation `{{ }}` 自動 escape，沒有 `v-html` 使用
+- [x] 權限最小化：只有 `storage` + 限定 `google.com` / `google.com.tw` host
+- [x] `loadSettings` 有逐欄位 type guard，stored 內容 prototype pollution 不會穿過
+- [x] CSS selector 全為 hardcoded，沒有來自使用者輸入的字串
+- [x] 沒有使用 regex，無 ReDoS 風險
+- [x] 完整 icon（16/32/48/96/128 px）
+- [ ] 使用者輸入長度上限（同 P1「輸入驗證」項）
+- [ ] 確認 `wxt zip` 產出不含 `.DS_Store` 或系統垃圾檔（`.gitignore` 有，但 build flow 不一定會自動過濾）
+
+## Known issues / 長期維護
+
+- Google CSS 選擇器會隨 Google DOM 改版而失效，需持續觀察並更新 `entrypoints/content/index.ts` 中的 selector
+- content script 內無使用者可見字串，i18n 暫不需要；若未來加 toast / banner 再加
+- 切換 popup 語言時，內建分類的 label / keywords 不會跟著切換（首次安裝就 seed 為單一 locale 的 string）— 這是儲存設計選擇，不是 bug
