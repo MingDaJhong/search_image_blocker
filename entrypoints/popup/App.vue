@@ -150,7 +150,8 @@ const messages = {
     globalBlock: "全域阻擋",
     globalBlockDesc: "不論搜尋什麼都隱藏",
     blockTypesTitle: "要隱藏的區塊",
-    blockImages: "圖片橫幅 / 圖片輪播",
+    blockImages: "圖片輪播 / 橫幅",
+    blockThumbnails: "搜尋結果縮圖",
     blockVideos: "影片卡片",
     blockSearchPreview: "搜尋建議縮圖（autocomplete）",
     blockRelatedQuestions: "相關問題",
@@ -197,7 +198,8 @@ const messages = {
     globalBlock: "Block all",
     globalBlockDesc: "Hide regardless of what you search",
     blockTypesTitle: "What to hide",
-    blockImages: "Image banner / carousel",
+    blockImages: "Image carousel / banner",
+    blockThumbnails: "Search result thumbnails",
     blockVideos: "Video cards",
     blockSearchPreview: "Autocomplete preview thumbnails",
     blockRelatedQuestions: "Related questions",
@@ -303,11 +305,16 @@ const showHeaderMenu = ref(false);
             'hover:bg-gray-100 dark:hover:bg-gray-800',
           ]"
           @click.stop="showHeaderMenu = !showHeaderMenu"
-        >···</button>
+        >
+          ···
+        </button>
 
         <template v-if="showHeaderMenu">
           <div class="fixed inset-0 z-10" @click="showHeaderMenu = false" />
-          <div class="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden" style="min-width:11rem">
+          <div
+            class="absolute right-0 top-full mt-1 z-20 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg overflow-hidden"
+            style="min-width: 11rem"
+          >
             <button
               type="button"
               :class="[
@@ -318,12 +325,24 @@ const showHeaderMenu = ref(false);
               ]"
               @click="togglePause"
             >
-              <svg v-if="!settings.paused" viewBox="0 0 20 20" class="w-4 h-4 fill-current shrink-0" aria-hidden="true">
-                <rect x="4" y="3" width="4" height="14" rx="1"/>
-                <rect x="12" y="3" width="4" height="14" rx="1"/>
+              <svg
+                v-if="!settings.paused"
+                viewBox="0 0 20 20"
+                class="w-4 h-4 fill-current shrink-0"
+                aria-hidden="true"
+              >
+                <rect x="4" y="3" width="4" height="14" rx="1" />
+                <rect x="12" y="3" width="4" height="14" rx="1" />
               </svg>
-              <svg v-else viewBox="0 0 20 20" class="w-4 h-4 fill-current shrink-0" aria-hidden="true">
-                <path d="M6 4.5a.5.5 0 0 1 .765-.424l9 5.5a.5.5 0 0 1 0 .848l-9 5.5A.5.5 0 0 1 6 15.5v-11Z"/>
+              <svg
+                v-else
+                viewBox="0 0 20 20"
+                class="w-4 h-4 fill-current shrink-0"
+                aria-hidden="true"
+              >
+                <path
+                  d="M6 4.5a.5.5 0 0 1 .765-.424l9 5.5a.5.5 0 0 1 0 .848l-9 5.5A.5.5 0 0 1 6 15.5v-11Z"
+                />
               </svg>
               {{ settings.paused ? t.resumeAria : t.pauseAria }}
             </button>
@@ -332,7 +351,11 @@ const showHeaderMenu = ref(false);
               class="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
               @click="toggleTheme"
             >
-              <span class="w-4 text-center text-base leading-none" aria-hidden="true">{{ settings.theme === "dark" ? "☀️" : "🌙" }}</span>
+              <span
+                class="w-4 text-center text-base leading-none"
+                aria-hidden="true"
+                >{{ settings.theme === "dark" ? "☀️" : "🌙" }}</span
+              >
               {{ t.themeToggleAria }}
             </button>
             <button
@@ -340,7 +363,11 @@ const showHeaderMenu = ref(false);
               class="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
               @click="toggleLocale"
             >
-              <span class="w-4 text-center text-xs font-bold tabular-nums" aria-hidden="true">{{ settings.locale === "zh-TW" ? "EN" : "中" }}</span>
+              <span
+                class="w-4 text-center text-xs font-bold tabular-nums"
+                aria-hidden="true"
+                >{{ settings.locale === "zh-TW" ? "EN" : "中" }}</span
+              >
               {{ t.localeToggleAria }}
             </button>
           </div>
@@ -389,7 +416,9 @@ const showHeaderMenu = ref(false);
           type="button"
           class="ml-2 underline underline-offset-2 hover:no-underline shrink-0"
           @click="togglePause"
-        >{{ t.resumeAria }}</button>
+        >
+          {{ t.resumeAria }}
+        </button>
       </div>
 
       <!-- 目前阻擋來源提示 -->
@@ -431,11 +460,11 @@ const showHeaderMenu = ref(false);
             class="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1.5 rounded"
           >
             <input
-              v-model="settings.blockTypes.images"
+              v-model="settings.blockTypes.thumbnails"
               type="checkbox"
               class="accent-primary-600"
             />
-            {{ t.blockImages }}
+            {{ t.blockThumbnails }}
           </label>
           <label
             class="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1.5 rounded"
@@ -446,6 +475,16 @@ const showHeaderMenu = ref(false);
               class="accent-primary-600"
             />
             {{ t.blockSearchPreview }}
+          </label>
+          <label
+            class="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1.5 rounded"
+          >
+            <input
+              v-model="settings.blockTypes.images"
+              type="checkbox"
+              class="accent-primary-600"
+            />
+            {{ t.blockImages }}
           </label>
           <label
             class="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1.5 rounded"

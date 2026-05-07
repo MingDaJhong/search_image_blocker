@@ -86,10 +86,12 @@ function buildBlockCSS(settings: BlocklistSettings): string {
       "g-scrolling-carousel",
       'div[data-attrid*="image"]',
       "g-img",
-      'div[data-attrid="kc:/local:hero image"]',
-      'div[data-attrid$="hero image"]',
-      'div[jsname="HiaYvf"]',
       "div[data-tts-text]",
+    );
+  }
+
+  if (settings.blockTypes.thumbnails) {
+    selectors.push(
       "#search img",
       "#rcnt img",
     );
@@ -111,7 +113,13 @@ function buildBlockCSS(settings: BlocklistSettings): string {
   }
 
   if (settings.blockTypes.knowledgePanel) {
-    selectors.push('div[data-attrid="kc:/"]', "#rhs");
+    selectors.push(
+      'div[data-attrid="kc:/"]',
+      "#rhs",
+      'div[data-attrid="kc:/local:hero image"]',
+      'div[data-attrid$="hero image"]',
+      'div[jsname="HiaYvf"]',
+    );
   }
 
   // searchPreview 不在這裡 — 由 observeAutocomplete() 逐 option 判斷

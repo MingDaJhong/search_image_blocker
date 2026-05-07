@@ -12,6 +12,8 @@ export interface BlocklistSettings {
   /** 要隱藏哪些區塊類型 */
   blockTypes: {
     images: boolean
+    /** 搜尋結果列表裡每一筆的縮圖 */
+    thumbnails: boolean
     videos: boolean
     relatedQuestions: boolean
     knowledgePanel: boolean
@@ -59,9 +61,9 @@ const DEFAULT_CATEGORIES: DefaultCategory[] = [
         '毛毛蟲', '蛆', '蚯蚓', '水蛭', '蝸牛', '蛞蝓',
       ],
       en: [
-        'insect', 'bug', 'spider', 'cockroach', 'centipede',
+        'insect', 'stink bug', 'spider', 'cockroach', 'centipede',
         'beetle', 'wasp', 'mosquito', 'maggot', 'larva',
-        'butterfly', 'moth', 'bee', 'hornet', 'ant',
+        'butterfly', 'moth', 'honeybee', 'bumblebee', 'hornet', 'fire ant',
         'termite', 'flea', 'louse', 'mite', 'dust mite',
         'caterpillar', 'worm', 'earthworm', 'leech', 'snail',
         'slug', 'scorpion', 'mantis', 'cicada', 'millipede',
@@ -80,9 +82,9 @@ const DEFAULT_CATEGORIES: DefaultCategory[] = [
         '鱷魚', '烏龜', '甲魚', '海龜',
       ],
       en: [
-        'snake', 'cobra', 'python', 'rattlesnake', 'viper',
+        'snake', 'cobra', 'ball python', 'python snake', 'rattlesnake', 'viper',
         'boa', 'mamba', 'cottonmouth', 'copperhead', 'anaconda',
-        'lizard', 'gecko', 'chameleon', 'iguana', 'komodo',
+        'lizard', 'gecko lizard', 'chameleon', 'iguana', 'komodo',
         'frog', 'toad', 'tadpole', 'salamander', 'newt',
         'crocodile', 'alligator', 'caiman', 'turtle', 'tortoise',
       ],
@@ -99,10 +101,10 @@ const DEFAULT_CATEGORIES: DefaultCategory[] = [
         '斷肢', '截肢', '內臟', '器官摘除',
       ],
       en: [
-        'gore', 'gory', 'blood', 'bloody', 'corpse', 'dead body',
+        'gore', 'gory', 'blood gore', 'bloody', 'corpse', 'dead body',
         'autopsy', 'gruesome', 'mutilation', 'dismemberment',
         'decapitation', 'beheading', 'massacre', 'carnage',
-        'torture', 'brutal', 'graphic violence', 'death scene',
+        'torture', 'brutal violence', 'graphic violence', 'death scene',
         'crime scene', 'accident scene', 'severed',
       ],
     },
@@ -210,6 +212,7 @@ export const DEFAULT_SETTINGS: BlocklistSettings = {
   globalBlock: false,
   blockTypes: {
     images: true,
+    thumbnails: true,
     videos: true,
     relatedQuestions: false,
     knowledgePanel: false,
