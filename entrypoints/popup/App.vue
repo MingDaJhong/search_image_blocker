@@ -11,6 +11,7 @@ import {
   PRESET_TEMPLATES,
   type Locale,
   type Category,
+  type AddKeywordResult,
 } from "@/composables/useBlockList";
 
 const {
@@ -100,8 +101,13 @@ function cancelEditLabel() {
 }
 function handleAddDetailKeyword() {
   if (!detailCategory.value) return;
-  addCatKeyword(detailCategory.value.id, detailNewKeyword.value);
-  detailNewKeyword.value = "";
+  const result = addCatKeyword(detailCategory.value.id, detailNewKeyword.value);
+  if (result === "added") {
+    detailNewKeyword.value = "";
+    detailKeywordError.value = null;
+  } else {
+    setKeywordError("detail", result);
+  }
 }
 function handleRemoveDetailKeyword(kw: string) {
   if (!detailCategory.value) return;
@@ -213,6 +219,8 @@ const messages = {
     importSuccess: "設定已成功匯入",
     importError: "匯入失敗：檔案格式不正確",
     storageLabel: "儲存配額",
+    errorEmpty: "請輸入關鍵字",
+    errorDuplicate: "此關鍵字已存在",
     blockedByMsg: (kw: string, cat: string | null) =>
       !kw
         ? "目前阻擋中：全域阻擋已啟用"
@@ -268,6 +276,8 @@ const messages = {
     importSuccess: "Settings imported successfully",
     importError: "Import failed: invalid file format",
     storageLabel: "Storage quota",
+    errorEmpty: "Please enter a keyword",
+    errorDuplicate: "This keyword already exists",
     blockedByMsg: (kw: string, cat: string | null) =>
       !kw
         ? "Blocking active: global block is on"
@@ -289,9 +299,39 @@ watch(
   { immediate: true },
 );
 
+const newKeywordError = ref<AddKeywordResult | null>(null);
+const detailKeywordError = ref<AddKeywordResult | null>(null);
+let newKeywordErrorTimer = 0;
+let detailKeywordErrorTimer = 0;
+
+function setKeywordError(
+  target: "main" | "detail",
+  result: AddKeywordResult,
+) {
+  if (result === "added") return;
+  if (target === "main") {
+    clearTimeout(newKeywordErrorTimer);
+    newKeywordError.value = result;
+    newKeywordErrorTimer = window.setTimeout(() => {
+      newKeywordError.value = null;
+    }, 2500);
+  } else {
+    clearTimeout(detailKeywordErrorTimer);
+    detailKeywordError.value = result;
+    detailKeywordErrorTimer = window.setTimeout(() => {
+      detailKeywordError.value = null;
+    }, 2500);
+  }
+}
+
 function handleAdd() {
-  addKeyword(newKeyword.value);
-  newKeyword.value = "";
+  const result = addKeyword(newKeyword.value);
+  if (result === "added") {
+    newKeyword.value = "";
+    newKeywordError.value = null;
+  } else {
+    setKeywordError("main", result);
+  }
 }
 
 function toggleExpand(id: string) {
@@ -853,12 +893,21 @@ async function handleFileChange(event: Event) {
           {{ t.customKeywordsTitle }}
         </h2>
 
-        <form class="flex gap-2 mb-2" @submit.prevent="handleAdd">
+        <form
+          :class="['flex gap-2', newKeywordError ? 'mb-0' : 'mb-2']"
+          @submit.prevent="handleAdd"
+        >
           <input
             v-model="newKeyword"
             type="text"
             :placeholder="t.keywordPlaceholder"
-            class="flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            :class="[
+              'flex-1 px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:border-transparent dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500',
+              newKeywordError
+                ? 'border-red-400 dark:border-red-600 focus:ring-red-400'
+                : 'border-gray-300 dark:border-gray-700 focus:ring-primary-500',
+            ]"
+            @input="newKeywordError = null"
           />
           <button
             type="submit"
@@ -867,6 +916,14 @@ async function handleFileChange(event: Event) {
             {{ t.addBtn }}
           </button>
         </form>
+        <p
+          v-if="newKeywordError"
+          class="mt-1 mb-1 text-xs text-red-500 dark:text-red-400"
+        >
+          {{
+            newKeywordError === "duplicate" ? t.errorDuplicate : t.errorEmpty
+          }}
+        </p>
 
         <div
           v-if="settings.keywords.length === 0"
@@ -1005,12 +1062,21 @@ async function handleFileChange(event: Event) {
           {{ t.keywordsLabel }}
         </h2>
 
-        <form class="flex gap-2 mb-2" @submit.prevent="handleAddDetailKeyword">
+        <form
+          :class="['flex gap-2', detailKeywordError ? 'mb-0' : 'mb-2']"
+          @submit.prevent="handleAddDetailKeyword"
+        >
           <input
             v-model="detailNewKeyword"
             type="text"
             :placeholder="t.addKeywordPlaceholder"
-            class="flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+            :class="[
+              'flex-1 px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:border-transparent dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500',
+              detailKeywordError
+                ? 'border-red-400 dark:border-red-600 focus:ring-red-400'
+                : 'border-gray-300 dark:border-gray-700 focus:ring-primary-500',
+            ]"
+            @input="detailKeywordError = null"
           />
           <button
             type="submit"
@@ -1019,6 +1085,16 @@ async function handleFileChange(event: Event) {
             {{ t.addBtn }}
           </button>
         </form>
+        <p
+          v-if="detailKeywordError"
+          class="mt-1 mb-2 text-xs text-red-500 dark:text-red-400"
+        >
+          {{
+            detailKeywordError === "duplicate"
+              ? t.errorDuplicate
+              : t.errorEmpty
+          }}
+        </p>
 
         <div
           v-if="detailKeywords.length === 0"

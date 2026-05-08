@@ -162,6 +162,8 @@ export const PRESET_TEMPLATES: DefaultCategory[] = [
 
 export const STORAGE_KEY = 'sib_settings'
 
+export type AddKeywordResult = 'added' | 'duplicate' | 'empty'
+
 function detectDefaultTheme(): Theme {
   if (typeof matchMedia === 'undefined') return 'light'
   return matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
@@ -369,11 +371,12 @@ export function useBlockList() {
     { deep: true, flush: 'sync' },
   )
 
-  function addKeyword(keyword: string) {
+  function addKeyword(keyword: string): AddKeywordResult {
     const trimmed = keyword.trim()
-    if (!trimmed) return
-    if (settings.value.keywords.includes(trimmed)) return
+    if (!trimmed) return 'empty'
+    if (settings.value.keywords.includes(trimmed)) return 'duplicate'
     settings.value.keywords.push(trimmed)
+    return 'added'
   }
 
   function removeKeyword(keyword: string) {
@@ -418,12 +421,14 @@ export function useBlockList() {
     if (trimmed) cat.label = trimmed
   }
 
-  function addCatKeyword(id: string, keyword: string) {
+  function addCatKeyword(id: string, keyword: string): AddKeywordResult {
     const cat = settings.value.customCategories.find((c) => c.id === id)
-    if (!cat) return
+    if (!cat) return 'empty'
     const trimmed = keyword.trim()
-    if (!trimmed || cat.keywords.includes(trimmed)) return
+    if (!trimmed) return 'empty'
+    if (cat.keywords.includes(trimmed)) return 'duplicate'
     cat.keywords.push(trimmed)
+    return 'added'
   }
 
   function removeCatKeyword(id: string, keyword: string) {
