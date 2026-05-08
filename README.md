@@ -78,8 +78,8 @@ pnpm zip
 - [x] **總開關 / 暫停按鈕**：`BlocklistSettings.paused`，paused 時 `applyState` 早退、移除所有 CSS、disconnect observer、清掉 inline `visibility:hidden`。Popup header 選單有 toggle + 暫停 banner
 - [x] **拆分圖片相關 selector**：`blockTypes.images`（圖片橫幅）與 `blockTypes.thumbnails`（搜尋結果縮圖）已拆成兩個獨立選項
 - [x] **預設分類審查風險**：採第三選項「從程式碼移除改成『+ 範本』按鈕」— `gore`、`medical` 移到 `PRESET_TEMPLATES`，不再 auto-seed，使用者於 popup 主動加入
-- [x] **隱私權政策頁面**：`entrypoints/privacy/index.html` 已建立並由 popup footer 連結
-- [ ] **隱私權政策外部 URL**：把 `entrypoints/privacy/index.html` 內容也部署到 GitHub Pages，給 Chrome Web Store listing 填外部 URL 用
+- [x] **隱私權政策頁面**：`entrypoints/privacy/index.html` 已建立並由 popup footer 連結（路徑為 `/privacy.html`，extension 內可直接開）
+- [x] **隱私權政策外部 URL**：GitHub Pages 部署於 [https://mingdajhong.github.io/search_image_blocker/privacy.html](https://mingdajhong.github.io/search_image_blocker/privacy.html)；repo 根目錄的 `privacy.html` 是 `entrypoints/privacy/index.html` 的副本，內容變動後兩處要同步
 - [ ] 至少一張螢幕截圖（1280x800 或 640x400）
 - [ ] Chrome Web Store listing：詳細描述、簡短描述、分類
 - [ ] 註冊 Chrome Web Store Developer 帳號（一次性 $5 USD）
