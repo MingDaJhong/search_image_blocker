@@ -28,8 +28,10 @@ pnpm zip
 │   ├── content/           # Content script（注入 google.com）
 │   │   └── index.ts       # CSS 隱藏 + autocomplete MutationObserver
 │   └── popup/             # 點擊圖示彈出的設定頁
-│       ├── App.vue        # 主 UI（Vue 3 + Tailwind）
-│       ├── main.ts        # 首次渲染前同步套用 dark class（防閃爍）
+│       ├── App.vue            # 主畫面（Vue 3 + Tailwind）
+│       ├── CategoryDetail.vue # 分類詳情頁（編輯標題、管理關鍵字、刪除）
+│       ├── i18n.ts            # 多語系 messages
+│       ├── main.ts            # 首次渲染前同步套用 dark class（防閃爍）
 │       ├── style.css
 │       └── index.html
 ├── composables/
@@ -62,6 +64,9 @@ pnpm zip
 - **多語系**：popup 支援繁體中文 / English 切換（首次安裝跟 `navigator.language`）
 - **深色模式**：popup 支援淺色 / 深色切換（首次安裝跟系統偏好，防閃爍）
 - **設定同步**：使用 `chrome.storage.sync`，跨裝置自動同步
+- **匯入 / 匯出設定**：popup 選單提供 JSON 下載 / 上傳，方便備份與跨機遷移
+- **儲存配額顯示**：footer 即時顯示已使用 KB / 100KB 進度條，70% 轉黃、90% 轉紅
+- **輸入驗證**：新增關鍵字 / 分類時，空白與重複會即時 inline 提示，2.5 秒後自動消失
 
 ## 上架前完善計畫
 
@@ -81,22 +86,22 @@ pnpm zip
 
 ### P1 — 強烈建議
 
-- [ ] **匯入 / 匯出設定**：`JSON.stringify(settings)` 下載 + 上傳還原，讓使用者備份與跨機遷移
-- [ ] **儲存配額用量顯示**：用 `chrome.storage.sync.getBytesInUse()` 在 popup footer 顯示 `已使用 X% / 100KB`，主動預警，避免靜默爆掉才看到 `saveError`
+- [x] **匯入 / 匯出設定**：popup 選單下載 `sib-settings-YYYY-MM-DD.json`，上傳時走 `parseImport()` 做 schema 正規化，成功 / 失敗都有 banner 回饋
+- [x] **儲存配額用量顯示**：`chrome.storage.sync.getBytesInUse()` 在 popup footer 顯示 `X.X / 100 KB` 進度條，70% 轉黃、90% 轉紅
 - [ ] **關鍵字 enable / disable**：把 `keywords: string[]` 升級為 `{ text: string, enabled: boolean }[]`，搭配 `loadSettings` 的 normalize 做舊資料遷移。**這項基本取代了 regex 的需求** — 大部分使用者真正要的不是 regex，而是「我這個關鍵字暫時不想生效」
-- [ ] **輸入驗證 + 重複回饋**：`addKeyword` / `addCategory` 加長度上限（關鍵字 50 字、分類名稱 30 字）；重複時 input 邊框閃紅 + 提示「已存在」，不要靜默忽略
-- [ ] **autocomplete observer 效能**：加 `requestAnimationFrame` 或 ~50ms throttle 合併連續 mutation；`shouldBlock` hot path 的 `k.toLowerCase()` 預先快取
+- [x] **輸入驗證 + 重複回饋**：`addKeyword` / `addCatKeyword` 回傳 `'added' | 'duplicate' | 'empty'`，UI 收到非 `'added'` 時 input 邊框轉紅並顯示對應提示文案，2.5 秒後自動消失
+- [x] **autocomplete observer 效能**：`requestAnimationFrame` debounce 合併同 frame mutation；listbox 不存在時提早返回；觀察根縮小到搜尋框 `<form>`
 - [ ] **「還原預設分類」按鈕**：`DEFAULT_CATEGORIES` 已在程式碼中，使用者誤刪後給一鍵恢復入口
 
 ### P2 — Nice to have
 
 - [ ] **搜尋頁阻擋回饋**：`browser.action.setBadgeText` 顯示阻擋數量，或頁面角落 toast「已隱藏 X 個區塊」（可關），同時方便除錯 selector 失效
 - [ ] **「精確匹配」開關**：每個關鍵字一個 ☑ 精確匹配選項，解決「蛇」誤命「蛇皮包」「蛇麼」，比 regex 友善
-- [ ] **i18n 拆檔**：`App.vue` 中的 `messages` 拆到 `composables/i18n.ts`，避免 App.vue 持續膨脹
+- [x] **i18n 拆檔**：`messages` 已抽到 `entrypoints/popup/i18n.ts`，`Messages` 型別由 `(typeof messages)[Locale]` 推出，App.vue 不再內嵌字串表
 - [ ] **純函式測試**：vitest 加 `shouldBlock` / `findBlockMatch` / `normalizeCategoryOrder` / `readLegacyOverrides` 的回歸測試
 - [ ] **鍵盤快捷鍵**：用 manifest `commands` 欄位允許快速開啟 popup
 - [ ] **三態主題**（auto / light / dark）— 目前只有 binary
-- [ ] **autocomplete observer 範圍**縮小到搜尋框父容器，省 DOM 監聽成本（目前監聽 `documentElement`）
+- [x] **autocomplete observer 範圍**：已縮小到搜尋框 `<form>`（找不到才退回 `documentElement`），減少 DOM 監聽成本
 
 ### 安全性檢查
 

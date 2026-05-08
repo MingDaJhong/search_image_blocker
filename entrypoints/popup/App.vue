@@ -13,6 +13,8 @@ import {
   type Category,
   type AddKeywordResult,
 } from "@/composables/useBlockList";
+import { messages, type Messages } from "./i18n";
+import CategoryDetail from "./CategoryDetail.vue";
 
 const {
   settings,
@@ -68,11 +70,6 @@ const detailCategory = computed<Category | null>(() => {
   if (!id) return null;
   return settings.value.customCategories.find((c) => c.id === id) ?? null;
 });
-const detailLabel = computed(() => detailCategory.value?.label ?? "");
-const detailKeywords = computed(() => detailCategory.value?.keywords ?? []);
-const detailNewKeyword = ref("");
-const editingLabel = ref(false);
-const labelDraft = ref("");
 
 // 新增分類表單狀態
 const showAddCategory = ref(false);
@@ -80,43 +77,9 @@ const newCategoryName = ref("");
 
 function openCategory(id: string) {
   detailCategoryId.value = id;
-  editingLabel.value = false;
-  detailNewKeyword.value = "";
 }
 function closeCategory() {
   detailCategoryId.value = null;
-  editingLabel.value = false;
-}
-function startEditLabel() {
-  labelDraft.value = detailLabel.value;
-  editingLabel.value = true;
-}
-function commitLabel() {
-  if (!detailCategory.value) return;
-  setCatLabel(detailCategory.value.id, labelDraft.value);
-  editingLabel.value = false;
-}
-function cancelEditLabel() {
-  editingLabel.value = false;
-}
-function handleAddDetailKeyword() {
-  if (!detailCategory.value) return;
-  const result = addCatKeyword(detailCategory.value.id, detailNewKeyword.value);
-  if (result === "added") {
-    detailNewKeyword.value = "";
-    detailKeywordError.value = null;
-  } else {
-    setKeywordError("detail", result);
-  }
-}
-function handleRemoveDetailKeyword(kw: string) {
-  if (!detailCategory.value) return;
-  removeCatKeyword(detailCategory.value.id, kw);
-}
-function handleDeleteCategory() {
-  if (!detailCategory.value) return;
-  removeCategory(detailCategory.value.id);
-  closeCategory();
 }
 function handleAddCategory() {
   const id = addCategory(newCategoryName.value);
@@ -170,124 +133,7 @@ const orderedCategories = computed<Category[]>({
   },
 });
 
-// i18n 字串表 — 加新字串就在這兩邊各補一筆
-const messages = {
-  "zh-TW": {
-    subtitle: "隱藏 Google 搜尋的視覺干擾",
-    loading: "載入中…",
-    globalBlock: "全域阻擋",
-    globalBlockDesc: "不論搜尋什麼都隱藏",
-    blockTypesTitle: "要隱藏的區塊",
-    blockImages: "圖片輪播 / 橫幅",
-    blockThumbnails: "搜尋結果縮圖",
-    blockVideos: "影片卡片",
-    blockSearchPreview: "搜尋建議縮圖（autocomplete）",
-    blockRelatedQuestions: "相關問題",
-    blockKnowledgePanel: "知識面板（右側）",
-    categoriesTitle: "觸發分類",
-    keywordCount: (n: number) => `${n} 個關鍵字`,
-    collapse: "收合",
-    customKeywordsTitle: "自訂關鍵字",
-    keywordPlaceholder: "輸入關鍵字後 Enter",
-    addBtn: "新增",
-    noKeywords: "尚未設定關鍵字",
-    removeAria: (kw: string) => `移除 ${kw}`,
-    menuAria: "更多選項",
-    pauseAria: "暫停封鎖",
-    resumeAria: "繼續封鎖",
-    pausedBanner: "封鎖已暫停",
-    privacyPolicy: "隱私權政策",
-    keywordSep: "、",
-    themeToggleAria: "切換主題",
-    localeToggleAria: "切換語言",
-    dragHandleAria: "拖曳排序",
-    openCategoryAria: "編輯此分類",
-    backAria: "返回",
-    editTitleAria: "編輯標題",
-    saveBtn: "儲存",
-    cancelBtn: "取消",
-    keywordsLabel: "關鍵字",
-    addKeywordPlaceholder: "輸入關鍵字後 Enter",
-    emptyCategoryKeywords: "此分類尚無關鍵字",
-    addCategoryBtn: "新增分類",
-    newCategoryPlaceholder: "輸入分類名稱",
-    presetsLabel: "或從範本：",
-    deleteCategoryBtn: "刪除此分類",
-    saveError: "儲存失敗：設定空間已達上限，請刪除部分分類或關鍵字。",
-    exportSettings: "匯出設定",
-    importSettings: "匯入設定",
-    importSuccess: "設定已成功匯入",
-    importError: "匯入失敗：檔案格式不正確",
-    storageLabel: "儲存配額",
-    errorEmpty: "請輸入關鍵字",
-    errorDuplicate: "此關鍵字已存在",
-    blockedByMsg: (kw: string, cat: string | null) =>
-      !kw
-        ? "目前阻擋中：全域阻擋已啟用"
-        : cat
-          ? `目前阻擋中：關鍵字「${kw}」（${cat}）`
-          : `目前阻擋中：自訂關鍵字「${kw}」`,
-  },
-  en: {
-    subtitle: "Hide visual clutter from Google Search",
-    loading: "Loading…",
-    globalBlock: "Block all",
-    globalBlockDesc: "Hide regardless of what you search",
-    blockTypesTitle: "What to hide",
-    blockImages: "Image carousel / banner",
-    blockThumbnails: "Search result thumbnails",
-    blockVideos: "Video cards",
-    blockSearchPreview: "Autocomplete preview thumbnails",
-    blockRelatedQuestions: "Related questions",
-    blockKnowledgePanel: "Knowledge panel (right)",
-    categoriesTitle: "Trigger categories",
-    keywordCount: (n: number) => `${n} keywords`,
-    collapse: "Collapse",
-    customKeywordsTitle: "Custom keywords",
-    keywordPlaceholder: "Type a keyword and press Enter",
-    addBtn: "Add",
-    noKeywords: "No custom keywords yet",
-    removeAria: (kw: string) => `Remove ${kw}`,
-    menuAria: "More options",
-    pauseAria: "Pause blocking",
-    resumeAria: "Resume blocking",
-    pausedBanner: "Blocking paused",
-    privacyPolicy: "Privacy Policy",
-    keywordSep: ", ",
-    themeToggleAria: "Toggle theme",
-    localeToggleAria: "Toggle language",
-    dragHandleAria: "Drag to reorder",
-    openCategoryAria: "Edit this category",
-    backAria: "Back",
-    editTitleAria: "Edit title",
-    saveBtn: "Save",
-    cancelBtn: "Cancel",
-    keywordsLabel: "Keywords",
-    addKeywordPlaceholder: "Type a keyword and press Enter",
-    emptyCategoryKeywords: "No keywords in this category",
-    addCategoryBtn: "Add category",
-    newCategoryPlaceholder: "Category name",
-    presetsLabel: "Or from preset:",
-    deleteCategoryBtn: "Delete this category",
-    saveError:
-      "Save failed: storage quota exceeded. Please remove some categories or keywords.",
-    exportSettings: "Export settings",
-    importSettings: "Import settings",
-    importSuccess: "Settings imported successfully",
-    importError: "Import failed: invalid file format",
-    storageLabel: "Storage quota",
-    errorEmpty: "Please enter a keyword",
-    errorDuplicate: "This keyword already exists",
-    blockedByMsg: (kw: string, cat: string | null) =>
-      !kw
-        ? "Blocking active: global block is on"
-        : cat
-          ? `Blocking active: keyword "${kw}" (${cat})`
-          : `Blocking active: custom keyword "${kw}"`,
-  },
-} as const;
-
-const t = computed(() => messages[settings.value.locale]);
+const t = computed<Messages>(() => messages[settings.value.locale]);
 
 // theme 變動時：套 dark class、寫 localStorage cache（給下次 popup 開啟時 main.ts 同步讀）
 watch(
@@ -300,38 +146,20 @@ watch(
 );
 
 const newKeywordError = ref<AddKeywordResult | null>(null);
-const detailKeywordError = ref<AddKeywordResult | null>(null);
 let newKeywordErrorTimer = 0;
-let detailKeywordErrorTimer = 0;
-
-function setKeywordError(
-  target: "main" | "detail",
-  result: AddKeywordResult,
-) {
-  if (result === "added") return;
-  if (target === "main") {
-    clearTimeout(newKeywordErrorTimer);
-    newKeywordError.value = result;
-    newKeywordErrorTimer = window.setTimeout(() => {
-      newKeywordError.value = null;
-    }, 2500);
-  } else {
-    clearTimeout(detailKeywordErrorTimer);
-    detailKeywordError.value = result;
-    detailKeywordErrorTimer = window.setTimeout(() => {
-      detailKeywordError.value = null;
-    }, 2500);
-  }
-}
 
 function handleAdd() {
   const result = addKeyword(newKeyword.value);
   if (result === "added") {
     newKeyword.value = "";
     newKeywordError.value = null;
-  } else {
-    setKeywordError("main", result);
+    return;
   }
+  clearTimeout(newKeywordErrorTimer);
+  newKeywordError.value = result;
+  newKeywordErrorTimer = window.setTimeout(() => {
+    newKeywordError.value = null;
+  }, 2500);
 }
 
 function toggleExpand(id: string) {
@@ -578,7 +406,7 @@ async function handleFileChange(event: Event) {
         </svg>
       </button>
       <h1 class="flex-1 min-w-0 text-base font-semibold leading-tight truncate">
-        {{ detailLabel }}
+        {{ detailCategory.label }}
       </h1>
     </header>
 
@@ -998,127 +826,16 @@ async function handleFileChange(event: Event) {
       </footer>
     </template>
 
-    <!-- 分類詳情頁：編輯標題 + 新增/刪除關鍵字 -->
-    <template v-else>
-      <section class="mb-4">
-        <h2
-          class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2"
-        >
-          {{ t.categoriesTitle }}
-        </h2>
-        <div class="flex items-center gap-2">
-          <template v-if="!editingLabel">
-            <div class="flex-1 min-w-0 text-sm font-medium truncate">
-              {{ detailLabel }}
-            </div>
-            <button
-              type="button"
-              :title="t.editTitleAria"
-              :aria-label="t.editTitleAria"
-              class="px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
-              @click="startEditLabel"
-            >
-              ✎
-            </button>
-          </template>
-          <template v-else>
-            <input
-              v-model="labelDraft"
-              type="text"
-              class="flex-1 min-w-0 px-2 py-1 text-sm border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-              @keyup.enter="commitLabel"
-              @keyup.escape="cancelEditLabel"
-            />
-            <button
-              type="button"
-              class="px-2 py-1 text-xs bg-primary-600 hover:bg-primary-700 text-white rounded-md"
-              @click="commitLabel"
-            >
-              {{ t.saveBtn }}
-            </button>
-            <button
-              type="button"
-              class="px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
-              @click="cancelEditLabel"
-            >
-              {{ t.cancelBtn }}
-            </button>
-          </template>
-        </div>
-        <button
-          v-if="detailCategory"
-          type="button"
-          class="mt-3 w-full px-3 py-1.5 text-xs text-red-600 dark:text-red-400 border border-red-200 dark:border-red-800 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-          @click="handleDeleteCategory"
-        >
-          {{ t.deleteCategoryBtn }}
-        </button>
-      </section>
-
-      <section>
-        <h2
-          class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2"
-        >
-          {{ t.keywordsLabel }}
-        </h2>
-
-        <form
-          :class="['flex gap-2', detailKeywordError ? 'mb-0' : 'mb-2']"
-          @submit.prevent="handleAddDetailKeyword"
-        >
-          <input
-            v-model="detailNewKeyword"
-            type="text"
-            :placeholder="t.addKeywordPlaceholder"
-            :class="[
-              'flex-1 px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:border-transparent dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500',
-              detailKeywordError
-                ? 'border-red-400 dark:border-red-600 focus:ring-red-400'
-                : 'border-gray-300 dark:border-gray-700 focus:ring-primary-500',
-            ]"
-            @input="detailKeywordError = null"
-          />
-          <button
-            type="submit"
-            class="px-3 py-1.5 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors"
-          >
-            {{ t.addBtn }}
-          </button>
-        </form>
-        <p
-          v-if="detailKeywordError"
-          class="mt-1 mb-2 text-xs text-red-500 dark:text-red-400"
-        >
-          {{
-            detailKeywordError === "duplicate"
-              ? t.errorDuplicate
-              : t.errorEmpty
-          }}
-        </p>
-
-        <div
-          v-if="detailKeywords.length === 0"
-          class="text-xs text-gray-400 dark:text-gray-500 text-center py-3"
-        >
-          {{ t.emptyCategoryKeywords }}
-        </div>
-        <ul v-else class="flex flex-wrap gap-1.5">
-          <li
-            v-for="kw in detailKeywords"
-            :key="kw"
-            class="inline-flex items-center gap-1 px-2 py-1 bg-primary-50 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 text-xs rounded-md max-w-[10rem] overflow-hidden"
-          >
-            <span class="truncate" :title="kw">{{ kw }}</span>
-            <button
-              class="hover:text-primary-900 dark:hover:text-primary-100 font-bold leading-none"
-              :aria-label="t.removeAria(kw)"
-              @click="handleRemoveDetailKeyword(kw)"
-            >
-              ×
-            </button>
-          </li>
-        </ul>
-      </section>
-    </template>
+    <!-- 分類詳情頁 -->
+    <CategoryDetail
+      v-else
+      :category="detailCategory"
+      :t="t"
+      :set-cat-label="setCatLabel"
+      :add-cat-keyword="addCatKeyword"
+      :remove-cat-keyword="removeCatKeyword"
+      :remove-category="removeCategory"
+      @deleted="closeCategory"
+    />
   </div>
 </template>
