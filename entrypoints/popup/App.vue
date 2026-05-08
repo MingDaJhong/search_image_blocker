@@ -7,6 +7,7 @@ import {
   findBlockMatch,
   shouldBlock,
   parseImport,
+  STORAGE_KEY,
   PRESET_TEMPLATES,
   type Locale,
   type Category,
@@ -40,6 +41,7 @@ const blockMatch = computed(() => {
 
 watch(loaded, async (isLoaded) => {
   if (!isLoaded) return;
+  refreshStorageUsage();
   try {
     const tabs = await browser.tabs.query({
       active: true,
@@ -120,9 +122,7 @@ function handleAddCategory() {
 }
 
 const availablePresets = computed(() => {
-  const existingIds = new Set(
-    settings.value.customCategories.map((c) => c.id),
-  );
+  const existingIds = new Set(settings.value.customCategories.map((c) => c.id));
   const locale = settings.value.locale;
   return PRESET_TEMPLATES.filter((p) => !existingIds.has(p.id)).map((p) => ({
     id: p.id,
@@ -212,6 +212,7 @@ const messages = {
     importSettings: "匯入設定",
     importSuccess: "設定已成功匯入",
     importError: "匯入失敗：檔案格式不正確",
+    storageLabel: "儲存配額",
     blockedByMsg: (kw: string, cat: string | null) =>
       !kw
         ? "目前阻擋中：全域阻擋已啟用"
@@ -266,6 +267,7 @@ const messages = {
     importSettings: "Import settings",
     importSuccess: "Settings imported successfully",
     importError: "Import failed: invalid file format",
+    storageLabel: "Storage quota",
     blockedByMsg: (kw: string, cat: string | null) =>
       !kw
         ? "Blocking active: global block is on"
@@ -310,6 +312,34 @@ function togglePause() {
 }
 
 const showHeaderMenu = ref(false);
+
+// 儲存配額
+const STORAGE_QUOTA = 102400; // chrome.storage.sync.QUOTA_BYTES = 100 KB
+const storageBytes = ref(0);
+const storageKB = computed(() => (storageBytes.value / 1024).toFixed(1));
+const storagePercent = computed(() =>
+  Math.min(100, Math.round((storageBytes.value / STORAGE_QUOTA) * 100)),
+);
+const storageBarColor = computed(() => {
+  const p = storagePercent.value;
+  if (p >= 90) return "bg-red-500";
+  if (p >= 70) return "bg-amber-400";
+  return "bg-primary-500";
+});
+
+async function refreshStorageUsage() {
+  try {
+    const bytes = await browser.storage.sync.getBytesInUse(STORAGE_KEY);
+    storageBytes.value = bytes;
+  } catch {
+    // Firefox 或 API 不支援時靜默忽略
+  }
+}
+
+browser.storage.onChanged.addListener((changes, area) => {
+  if (area === "sync" && STORAGE_KEY in changes) refreshStorageUsage();
+});
+
 const importFileInput = ref<HTMLInputElement | null>(null);
 const importStatus = ref<"success" | "error" | null>(null);
 
@@ -462,7 +492,9 @@ async function handleFileChange(event: Event) {
                 class="w-4 h-4 fill-current shrink-0"
                 aria-hidden="true"
               >
-                <path d="M10 2a1 1 0 0 1 1 1v8.586l2.293-2.293a1 1 0 1 1 1.414 1.414l-4 4a1 1 0 0 1-1.414 0l-4-4a1 1 0 1 1 1.414-1.414L9 11.586V3a1 1 0 0 1 1-1ZM3 15a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1Z" />
+                <path
+                  d="M10 2a1 1 0 0 1 1 1v8.586l2.293-2.293a1 1 0 1 1 1.414 1.414l-4 4a1 1 0 0 1-1.414 0l-4-4a1 1 0 1 1 1.414-1.414L9 11.586V3a1 1 0 0 1 1-1ZM3 15a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1Z"
+                />
               </svg>
               {{ t.exportSettings }}
             </button>
@@ -476,7 +508,9 @@ async function handleFileChange(event: Event) {
                 class="w-4 h-4 fill-current shrink-0"
                 aria-hidden="true"
               >
-                <path d="M10 18a1 1 0 0 1-1-1V8.414L6.707 10.707a1 1 0 0 1-1.414-1.414l4-4a1 1 0 0 1 1.414 0l4 4a1 1 0 0 1-1.414 1.414L11 8.414V17a1 1 0 0 1-1 1ZM3 5a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1Z" />
+                <path
+                  d="M10 18a1 1 0 0 1-1-1V8.414L6.707 10.707a1 1 0 0 1-1.414-1.414l4-4a1 1 0 0 1 1.414 0l4 4a1 1 0 0 1-1.414 1.414L11 8.414V17a1 1 0 0 1-1 1ZM3 5a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1Z"
+                />
               </svg>
               {{ t.importSettings }}
             </button>
@@ -860,9 +894,42 @@ async function handleFileChange(event: Event) {
       </section>
 
       <footer
-        class="mt-4 pt-3 border-t border-gray-200 dark:border-gray-800 text-xs text-gray-400 dark:text-gray-500 text-center"
+        class="mt-4 pt-3 border-t border-gray-200 dark:border-gray-800 text-xs text-gray-400 dark:text-gray-500"
       >
-        <div>
+        <!-- 儲存配額進度條 -->
+        <div v-if="storageBytes > 0" class="mb-2">
+          <div class="flex justify-between mb-1">
+            <span>{{ t.storageLabel }}</span>
+            <span
+              :class="
+                storagePercent >= 90
+                  ? 'text-red-500'
+                  : storagePercent >= 70
+                    ? 'text-amber-500'
+                    : ''
+              "
+              >{{ storageKB }} / 100 KB</span
+            >
+          </div>
+          <div
+            class="h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden"
+          >
+            <div
+              :class="[
+                storageBarColor,
+                'h-full rounded-full transition-all duration-500',
+              ]"
+              :style="{ width: storagePercent + '%' }"
+            />
+          </div>
+        </div>
+        <div
+          class="text-center"
+          :class="{
+            'mt-4 pt-3 border-t border-gray-200 dark:border-gray-800':
+              storageBytes > 0,
+          }"
+        >
           <a
             href="/privacy.html"
             target="_blank"
