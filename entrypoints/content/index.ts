@@ -174,6 +174,11 @@ function clearAutocompleteStyles(): void {
  *
  * 接受 getter 而非直接傳入 settings，使 storage 變更後不需重建 observer
  * 就能即時讀到最新設定。
+ *
+ * 效能設計：
+ * - rAF debounce：同一 frame 內的多次 mutation 只 processAll 一次
+ * - listbox 不存在時立即返回，避免多個 querySelectorAll 白跑
+ * - 觀察根縮小到搜尋框的 <form>，排除頁面其餘 DOM 噪音
  */
 function observeAutocomplete(
   getSettings: () => BlocklistSettings,
@@ -196,6 +201,9 @@ function observeAutocomplete(
   }
 
   function processAll() {
+    // autocomplete 關閉時直接跳出，避免不必要的全文件查詢
+    if (!document.querySelector('[role="listbox"]')) return;
+
     const settings = getSettings();
     const inputValue = getInputValue();
     const inputBlocked = inputValue ? shouldBlock(inputValue, settings) : false;
@@ -229,8 +237,24 @@ function observeAutocomplete(
     });
   }
 
-  const observer = new MutationObserver(processAll);
-  observer.observe(document.documentElement, {
+  // rAF debounce：同一 frame 的多筆 mutation 只執行一次 processAll
+  let rafId: number | null = null;
+  function scheduleProcessAll() {
+    if (rafId !== null) return;
+    rafId = requestAnimationFrame(() => {
+      rafId = null;
+      processAll();
+    });
+  }
+
+  // 把觀察根縮小到搜尋框的 <form>；找不到才退回 documentElement
+  const searchInput = document.querySelector(
+    'textarea[name="q"], input[name="q"]',
+  );
+  const observationRoot = searchInput?.closest("form") ?? document.documentElement;
+
+  const observer = new MutationObserver(scheduleProcessAll);
+  observer.observe(observationRoot, {
     childList: true,
     subtree: true,
     attributes: true,
