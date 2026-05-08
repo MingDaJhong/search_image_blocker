@@ -448,6 +448,56 @@ export function useBlockList() {
 }
 
 /**
+ * 解析並正規化匯入的 JSON 字串，成功回傳 BlocklistSettings，失敗回傳 null。
+ * 接受 { version: 1, settings: {...} } 包裝格式，或裸的設定物件（向後相容）。
+ */
+export function parseImport(jsonStr: string): BlocklistSettings | null {
+  try {
+    const data = JSON.parse(jsonStr) as Record<string, unknown>
+    if (!data || typeof data !== 'object') return null
+
+    const raw = (
+      data.version === 1 && data.settings && typeof data.settings === 'object'
+        ? data.settings
+        : data
+    ) as Record<string, unknown>
+
+    const locale: Locale =
+      raw.locale === 'zh-TW' || raw.locale === 'en' ? raw.locale : detectDefaultLocale()
+
+    let categories = normalizeCategories(raw.customCategories)
+    if (categories.length === 0) {
+      categories = seedDefaultCategories(locale)
+    }
+    const categoryIds = categories.map((c) => c.id)
+    const enabledCategories = Array.isArray(raw.enabledCategories)
+      ? (raw.enabledCategories as unknown[]).filter((id): id is string => typeof id === 'string')
+      : [...DEFAULT_SETTINGS.enabledCategories]
+
+    return {
+      paused: typeof raw.paused === 'boolean' ? raw.paused : false,
+      globalBlock: typeof raw.globalBlock === 'boolean' ? raw.globalBlock : DEFAULT_SETTINGS.globalBlock,
+      blockTypes: {
+        ...DEFAULT_SETTINGS.blockTypes,
+        ...(raw.blockTypes && typeof raw.blockTypes === 'object'
+          ? (raw.blockTypes as Partial<BlocklistSettings['blockTypes']>)
+          : {}),
+      },
+      keywords: Array.isArray(raw.keywords)
+        ? (raw.keywords as unknown[]).filter((k): k is string => typeof k === 'string')
+        : [...DEFAULT_SETTINGS.keywords],
+      enabledCategories,
+      categoryOrder: normalizeCategoryOrder(raw.categoryOrder, categoryIds),
+      customCategories: categories,
+      locale,
+      theme: raw.theme === 'light' || raw.theme === 'dark' ? raw.theme : detectDefaultTheme(),
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
  * 判斷搜尋關鍵字是否命中黑名單
  */
 export function shouldBlock(query: string, settings: BlocklistSettings): boolean {

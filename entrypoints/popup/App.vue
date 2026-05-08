@@ -6,6 +6,7 @@ import {
   useBlockList,
   findBlockMatch,
   shouldBlock,
+  parseImport,
   PRESET_TEMPLATES,
   type Locale,
   type Category,
@@ -207,6 +208,10 @@ const messages = {
     presetsLabel: "或從範本：",
     deleteCategoryBtn: "刪除此分類",
     saveError: "儲存失敗：設定空間已達上限，請刪除部分分類或關鍵字。",
+    exportSettings: "匯出設定",
+    importSettings: "匯入設定",
+    importSuccess: "設定已成功匯入",
+    importError: "匯入失敗：檔案格式不正確",
     blockedByMsg: (kw: string, cat: string | null) =>
       !kw
         ? "目前阻擋中：全域阻擋已啟用"
@@ -257,6 +262,10 @@ const messages = {
     deleteCategoryBtn: "Delete this category",
     saveError:
       "Save failed: storage quota exceeded. Please remove some categories or keywords.",
+    exportSettings: "Export settings",
+    importSettings: "Import settings",
+    importSuccess: "Settings imported successfully",
+    importError: "Import failed: invalid file format",
     blockedByMsg: (kw: string, cat: string | null) =>
       !kw
         ? "Blocking active: global block is on"
@@ -301,10 +310,59 @@ function togglePause() {
 }
 
 const showHeaderMenu = ref(false);
+const importFileInput = ref<HTMLInputElement | null>(null);
+const importStatus = ref<"success" | "error" | null>(null);
+
+function handleExport() {
+  const payload = {
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    settings: JSON.parse(JSON.stringify(settings.value)),
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `sib-settings-${new Date().toISOString().slice(0, 10)}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showHeaderMenu.value = false;
+}
+
+function handleImportClick() {
+  showHeaderMenu.value = false;
+  importFileInput.value?.click();
+}
+
+async function handleFileChange(event: Event) {
+  const file = (event.target as HTMLInputElement).files?.[0];
+  if (!file) return;
+  const text = await file.text();
+  const parsed = parseImport(text);
+  if (!parsed) {
+    importStatus.value = "error";
+  } else {
+    settings.value = parsed;
+    importStatus.value = "success";
+  }
+  (event.target as HTMLInputElement).value = "";
+  setTimeout(() => {
+    importStatus.value = null;
+  }, 3000);
+}
 </script>
 
 <template>
   <div class="bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 p-4">
+    <input
+      ref="importFileInput"
+      type="file"
+      accept=".json,application/json"
+      class="hidden"
+      @change="handleFileChange"
+    />
     <header v-if="!detailCategory" class="flex items-center gap-2 mb-4">
       <img class="w-8 h-8" src="/icon/128.png" alt="logo" />
       <div class="flex-1 min-w-0">
@@ -393,6 +451,35 @@ const showHeaderMenu = ref(false);
               >
               {{ t.localeToggleAria }}
             </button>
+            <div class="border-t border-gray-100 dark:border-gray-700 my-1" />
+            <button
+              type="button"
+              class="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+              @click="handleExport"
+            >
+              <svg
+                viewBox="0 0 20 20"
+                class="w-4 h-4 fill-current shrink-0"
+                aria-hidden="true"
+              >
+                <path d="M10 2a1 1 0 0 1 1 1v8.586l2.293-2.293a1 1 0 1 1 1.414 1.414l-4 4a1 1 0 0 1-1.414 0l-4-4a1 1 0 1 1 1.414-1.414L9 11.586V3a1 1 0 0 1 1-1ZM3 15a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1Z" />
+              </svg>
+              {{ t.exportSettings }}
+            </button>
+            <button
+              type="button"
+              class="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+              @click="handleImportClick"
+            >
+              <svg
+                viewBox="0 0 20 20"
+                class="w-4 h-4 fill-current shrink-0"
+                aria-hidden="true"
+              >
+                <path d="M10 18a1 1 0 0 1-1-1V8.414L6.707 10.707a1 1 0 0 1-1.414-1.414l4-4a1 1 0 0 1 1.414 0l4 4a1 1 0 0 1-1.414 1.414L11 8.414V17a1 1 0 0 1-1 1ZM3 5a1 1 0 0 1 1-1h12a1 1 0 1 1 0 2H4a1 1 0 0 1-1-1Z" />
+              </svg>
+              {{ t.importSettings }}
+            </button>
           </div>
         </template>
       </div>
@@ -442,6 +529,20 @@ const showHeaderMenu = ref(false);
         >
           {{ t.resumeAria }}
         </button>
+      </div>
+
+      <!-- 匯入狀態提示 -->
+      <div
+        v-if="importStatus === 'success'"
+        class="mb-4 px-3 py-2 bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700 rounded-md text-xs text-green-700 dark:text-green-400"
+      >
+        {{ t.importSuccess }}
+      </div>
+      <div
+        v-else-if="importStatus === 'error'"
+        class="mb-4 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-xs text-red-600 dark:text-red-400"
+      >
+        {{ t.importError }}
       </div>
 
       <!-- 目前阻擋來源提示 -->
