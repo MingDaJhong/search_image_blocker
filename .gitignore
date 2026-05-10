@@ -10,3 +10,4 @@ stats-*.json
 .claude
 public/icon/*.svg
 public/icon/build.py
+public/icon/README.md
