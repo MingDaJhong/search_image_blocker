@@ -25,8 +25,8 @@ pnpm zip
 ```
 .
 ├── entrypoints/
-│   ├── content/           # Content script（注入 google.com）
-│   │   └── index.ts       # CSS 隱藏 + autocomplete MutationObserver
+│   ├── content/           # Content script（注入 16 個 Google TLDs）
+│   │   └── index.ts       # CSS 隱藏 + autocomplete MutationObserver + dev selector audit
 │   └── popup/             # 點擊圖示彈出的設定頁
 │       ├── App.vue            # 主畫面（Vue 3 + Tailwind）
 │       ├── CategoryDetail.vue # 分類詳情頁（編輯標題、管理關鍵字、刪除）
@@ -35,8 +35,10 @@ pnpm zip
 │       ├── style.css
 │       └── index.html
 ├── composables/
-│   └── useBlockList.ts    # 共用邏輯：設定型別、chrome.storage I/O、shouldBlock
-├── public/icon/           # Extension 圖示（16/32/48/96/128 px + SVG）
+│   ├── blockList.ts       # 純資料層（無 Vue）：型別、storage I/O、shouldBlock — content + popup 都用
+│   └── useBlockList.ts    # popup-only：Vue composable + mutators + parseImport / mergeSettings + PRESET_TEMPLATES
+├── public/icon/           # Extension 圖示 PNG（16/32/48/96/128 px，會被打包進 .crx）
+├── assets/icons-source/   # SVG 來源 + build.py（不在版控、不打包；本機備份保留）
 ├── wxt.config.ts          # WXT 設定檔（manifest 在這）
 ├── tailwind.config.js
 └── postcss.config.js
@@ -64,9 +66,11 @@ pnpm zip
 - **多語系**：popup 支援繁體中文 / English 切換（首次安裝跟 `navigator.language`）
 - **深色模式**：popup 支援淺色 / 深色切換（首次安裝跟系統偏好，防閃爍）
 - **設定同步**：使用 `chrome.storage.sync`，跨裝置自動同步
-- **匯入 / 匯出設定**：popup 選單提供 JSON 下載 / 上傳，方便備份與跨機遷移
+- **匯入 / 匯出設定**：popup 選單提供 JSON 下載 / 上傳，方便備份與跨機遷移；匯入時可選「合併」（把對方的關鍵字 / 分類加進來，保留個人 UI 偏好）或「取代」（清除目前所有設定再套用），避免誤點丟失自訂內容
 - **儲存配額顯示**：footer 即時顯示已使用 KB / 100KB 進度條，70% 轉黃、90% 轉紅
-- **輸入驗證**：新增關鍵字 / 分類時，空白與重複會即時 inline 提示，2.5 秒後自動消失
+- **輸入驗證**：新增關鍵字 / 分類時，空白、重複、過長（關鍵字 50 字、分類名稱 30 字）會即時 inline 提示，2.5 秒後自動消失；輸入框同步綁 `maxlength` 從 DOM 層擋住 paste / IME 過長字串
+- **多 TLD 支援**：覆蓋 16 個 Google 地區網域（.com / .com.tw / .com.hk / .co.jp / .co.kr / .com.sg / .co.uk / .com.au / .ca / .co.in / .de / .fr / .es / .it / .com.br / .com.mx）
+- **Dev 模式 selector 失效偵測**：`pnpm dev` 模式下 content script 啟動 2 秒後會檢查所有阻擋 selector 是否真的找到元素，全部 0 命中時 `console.warn` 提醒（production build 自動 strip）
 
 ## 上架前完善計畫
 
@@ -88,7 +92,7 @@ pnpm zip
 
 - [x] **匯入 / 匯出設定**：popup 選單下載 `sib-settings-YYYY-MM-DD.json`，上傳時走 `parseImport()` 做 schema 正規化，成功 / 失敗都有 banner 回饋
 - [x] **儲存配額用量顯示**：`chrome.storage.sync.getBytesInUse()` 在 popup footer 顯示 `X.X / 100 KB` 進度條，70% 轉黃、90% 轉紅
-- [ ] **關鍵字 enable / disable**：把 `keywords: string[]` 升級為 `{ text: string, enabled: boolean }[]`，搭配 `loadSettings` 的 normalize 做舊資料遷移。**這項基本取代了 regex 的需求** — 大部分使用者真正要的不是 regex，而是「我這個關鍵字暫時不想生效」
+- [~] **關鍵字 enable / disable**：評估後決定不做 — 全域 Pause 已涵蓋「臨時想搜被擋的詞」場景；per-keyword toggle 與既有 add / remove 模式並存會讓心智模型混亂（同一頁面：分類用 toggle、關鍵字用 toggle + 刪除？）。若未來再有需求，較好方向是「關鍵字組合的快速匯入 / 匯出」
 - [x] **輸入驗證 + 重複回饋**：`addKeyword` / `addCatKeyword` 回傳 `'added' | 'duplicate' | 'empty'`，UI 收到非 `'added'` 時 input 邊框轉紅並顯示對應提示文案，2.5 秒後自動消失
 - [x] **autocomplete observer 效能**：`requestAnimationFrame` debounce 合併同 frame mutation；listbox 不存在時提早返回；觀察根縮小到搜尋框 `<form>`
 - [ ] **「還原預設分類」按鈕**：`DEFAULT_CATEGORIES` 已在程式碼中，使用者誤刪後給一鍵恢復入口
@@ -111,7 +115,7 @@ pnpm zip
 - [x] CSS selector 全為 hardcoded，沒有來自使用者輸入的字串
 - [x] 沒有使用 regex，無 ReDoS 風險
 - [x] 完整 icon（16/32/48/96/128 px）
-- [ ] 使用者輸入長度上限（同 P1「輸入驗證」項）
+- [x] 使用者輸入長度上限：`MAX_KEYWORD_LEN = 50` / `MAX_LABEL_LEN = 30`，input 端 `maxlength` + composable 端 `'too_long'` 雙層擋；`loadSettings` / `parseImport` 也過濾過長字串，防 storage 被惡意 import 灌爆
 - [ ] 確認 `wxt zip` 產出不含 `.DS_Store` 或系統垃圾檔（`.gitignore` 有，但 build flow 不一定會自動過濾）
 
 ## Known issues / 長期維護

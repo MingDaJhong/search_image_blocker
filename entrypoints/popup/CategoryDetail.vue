@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import type { Category, AddKeywordResult } from "@/composables/useBlockList";
+import { MAX_KEYWORD_LEN, MAX_LABEL_LEN } from "@/composables/useBlockList";
 import type { Messages } from "./i18n";
 
 const props = defineProps<{
@@ -80,6 +81,7 @@ function handleDelete() {
         <input
           v-model="labelDraft"
           type="text"
+          :maxlength="MAX_LABEL_LEN"
           class="flex-1 min-w-0 px-2 py-1 text-sm border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           @keyup.enter="commitLabel"
           @keyup.escape="cancelEditLabel"
@@ -124,6 +126,7 @@ function handleDelete() {
         v-model="newKeyword"
         type="text"
         :placeholder="t.addKeywordPlaceholder"
+        :maxlength="MAX_KEYWORD_LEN"
         :class="[
           'flex-1 px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:border-transparent dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500',
           keywordError
@@ -143,7 +146,7 @@ function handleDelete() {
       v-if="keywordError"
       class="mt-1 mb-2 text-xs text-red-500 dark:text-red-400"
     >
-      {{ keywordError === "duplicate" ? t.errorDuplicate : t.errorEmpty }}
+      {{ keywordError === "duplicate" ? t.errorDuplicate : keywordError === "too_long" ? t.errorTooLong : t.errorEmpty }}
     </p>
 
     <div

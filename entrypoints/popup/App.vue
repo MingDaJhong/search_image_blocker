@@ -7,11 +7,15 @@ import {
   findBlockMatch,
   shouldBlock,
   parseImport,
+  mergeSettings,
   STORAGE_KEY,
   PRESET_TEMPLATES,
+  MAX_KEYWORD_LEN,
+  MAX_LABEL_LEN,
   type Locale,
   type Category,
   type AddKeywordResult,
+  type BlocklistSettings,
 } from "@/composables/useBlockList";
 import { messages, type Messages } from "./i18n";
 import CategoryDetail from "./CategoryDetail.vue";
@@ -209,7 +213,8 @@ browser.storage.onChanged.addListener((changes, area) => {
 });
 
 const importFileInput = ref<HTMLInputElement | null>(null);
-const importStatus = ref<"success" | "error" | null>(null);
+const importStatus = ref<"success" | "merged" | "error" | null>(null);
+const pendingImport = ref<BlocklistSettings | null>(null);
 
 function handleExport() {
   const payload = {
@@ -235,20 +240,45 @@ function handleImportClick() {
 }
 
 async function handleFileChange(event: Event) {
-  const file = (event.target as HTMLInputElement).files?.[0];
+  const target = event.target as HTMLInputElement;
+  const file = target.files?.[0];
+  target.value = "";
   if (!file) return;
   const text = await file.text();
   const parsed = parseImport(text);
   if (!parsed) {
     importStatus.value = "error";
-  } else {
-    settings.value = parsed;
-    importStatus.value = "success";
+    setTimeout(() => {
+      importStatus.value = null;
+    }, 3000);
+    return;
   }
-  (event.target as HTMLInputElement).value = "";
+  // 不立即套用 — 等使用者選合併或取代
+  pendingImport.value = parsed;
+}
+
+function applyImportMerge() {
+  if (!pendingImport.value) return;
+  settings.value = mergeSettings(settings.value, pendingImport.value);
+  pendingImport.value = null;
+  importStatus.value = "merged";
   setTimeout(() => {
     importStatus.value = null;
   }, 3000);
+}
+
+function applyImportReplace() {
+  if (!pendingImport.value) return;
+  settings.value = pendingImport.value;
+  pendingImport.value = null;
+  importStatus.value = "success";
+  setTimeout(() => {
+    importStatus.value = null;
+  }, 3000);
+}
+
+function cancelImport() {
+  pendingImport.value = null;
 }
 </script>
 
@@ -261,6 +291,47 @@ async function handleFileChange(event: Event) {
       class="hidden"
       @change="handleFileChange"
     />
+
+    <!-- 匯入模式選擇 dialog -->
+    <div
+      v-if="pendingImport"
+      class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      @click.self="cancelImport"
+    >
+      <div
+        class="bg-white dark:bg-gray-800 rounded-md shadow-lg p-4 max-w-sm w-full border border-gray-200 dark:border-gray-700"
+      >
+        <h3 class="text-sm font-semibold mb-2">
+          {{ t.importPromptTitle }}
+        </h3>
+        <p class="text-xs text-gray-600 dark:text-gray-400 mb-4 leading-relaxed">
+          {{ t.importPromptDesc }}
+        </p>
+        <div class="flex gap-2 justify-end">
+          <button
+            type="button"
+            class="px-3 py-1.5 text-xs rounded-md border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+            @click="cancelImport"
+          >
+            {{ t.cancelBtn }}
+          </button>
+          <button
+            type="button"
+            class="px-3 py-1.5 text-xs rounded-md border border-red-300 dark:border-red-700 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+            @click="applyImportReplace"
+          >
+            {{ t.importReplaceBtn }}
+          </button>
+          <button
+            type="button"
+            class="px-3 py-1.5 text-xs rounded-md bg-primary-600 hover:bg-primary-700 text-white transition-colors"
+            @click="applyImportMerge"
+          >
+            {{ t.importMergeBtn }}
+          </button>
+        </div>
+      </div>
+    </div>
     <header v-if="!detailCategory" class="flex items-center gap-2 mb-4">
       <img class="w-10 h-10" src="/icon/128.png" alt="logo" />
       <div class="flex-1 min-w-0">
@@ -435,10 +506,10 @@ async function handleFileChange(event: Event) {
 
       <!-- 匯入狀態提示 -->
       <div
-        v-if="importStatus === 'success'"
+        v-if="importStatus === 'success' || importStatus === 'merged'"
         class="mb-4 px-3 py-2 bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-700 rounded-md text-xs text-green-700 dark:text-green-400"
       >
-        {{ t.importSuccess }}
+        {{ importStatus === "merged" ? t.importMergeSuccess : t.importSuccess }}
       </div>
       <div
         v-else-if="importStatus === 'error'"
@@ -597,6 +668,7 @@ async function handleFileChange(event: Event) {
             v-model="newCategoryName"
             type="text"
             :placeholder="t.newCategoryPlaceholder"
+            :maxlength="MAX_LABEL_LEN"
             class="flex-1 px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           />
           <button
@@ -729,6 +801,7 @@ async function handleFileChange(event: Event) {
             v-model="newKeyword"
             type="text"
             :placeholder="t.keywordPlaceholder"
+            :maxlength="MAX_KEYWORD_LEN"
             :class="[
               'flex-1 px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:border-transparent dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500',
               newKeywordError
@@ -749,7 +822,7 @@ async function handleFileChange(event: Event) {
           class="mt-1 mb-1 text-xs text-red-500 dark:text-red-400"
         >
           {{
-            newKeywordError === "duplicate" ? t.errorDuplicate : t.errorEmpty
+            newKeywordError === "duplicate" ? t.errorDuplicate : newKeywordError === "too_long" ? t.errorTooLong : t.errorEmpty
           }}
         </p>
 

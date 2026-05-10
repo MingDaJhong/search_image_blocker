@@ -46,10 +46,16 @@ export const messages = {
     exportSettings: "匯出設定",
     importSettings: "匯入設定",
     importSuccess: "設定已成功匯入",
+    importMergeSuccess: "設定已合併匯入",
     importError: "匯入失敗：檔案格式不正確",
+    importPromptTitle: "如何套用匯入的設定？",
+    importPromptDesc: "「合併」會把匯入的關鍵字 / 分類加到現有設定上；「取代」會清除目前所有設定後套用。",
+    importMergeBtn: "合併",
+    importReplaceBtn: "取代",
     storageLabel: "儲存配額",
     errorEmpty: "請輸入關鍵字",
     errorDuplicate: "此關鍵字已存在",
+    errorTooLong: "關鍵字過長（上限 50 字元）",
     blockedByMsg: (kw: string, cat: string | null) =>
       !kw
         ? "目前阻擋中：全域阻擋已啟用"
@@ -103,10 +109,16 @@ export const messages = {
     exportSettings: "Export settings",
     importSettings: "Import settings",
     importSuccess: "Settings imported successfully",
+    importMergeSuccess: "Settings merged successfully",
     importError: "Import failed: invalid file format",
+    importPromptTitle: "How to apply imported settings?",
+    importPromptDesc: "\"Merge\" adds the imported keywords / categories on top of your current settings. \"Replace\" wipes your current settings before applying.",
+    importMergeBtn: "Merge",
+    importReplaceBtn: "Replace",
     storageLabel: "Storage quota",
     errorEmpty: "Please enter a keyword",
     errorDuplicate: "This keyword already exists",
+    errorTooLong: "Keyword too long (50 characters max)",
     blockedByMsg: (kw: string, cat: string | null) =>
       !kw
         ? "Blocking active: global block is on"

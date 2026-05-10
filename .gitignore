@@ -8,6 +8,4 @@ stats-*.json
 *.log
 .DS_Store
 .claude
-public/icon/*.svg
-public/icon/build.py
-public/icon/README.md
+assets/icons-source/

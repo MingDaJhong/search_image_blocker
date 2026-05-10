@@ -5,15 +5,30 @@ import {
   shouldBlock,
   STORAGE_KEY,
   type BlocklistSettings,
-} from "@/composables/useBlockList";
+} from "@/composables/blockList";
 
 const BLOCK_STYLE_ID = "sib-block-style";
 const INITIAL_STYLE_ID = "sib-initial-hide";
 
 export default defineContentScript({
+  // 與 wxt.config.ts 的 host_permissions 同步維護（WXT 靜態分析需要字面量）
   matches: [
     "https://www.google.com/search*",
     "https://www.google.com.tw/search*",
+    "https://www.google.com.hk/search*",
+    "https://www.google.co.jp/search*",
+    "https://www.google.co.kr/search*",
+    "https://www.google.com.sg/search*",
+    "https://www.google.co.uk/search*",
+    "https://www.google.com.au/search*",
+    "https://www.google.ca/search*",
+    "https://www.google.co.in/search*",
+    "https://www.google.de/search*",
+    "https://www.google.fr/search*",
+    "https://www.google.es/search*",
+    "https://www.google.it/search*",
+    "https://www.google.com.br/search*",
+    "https://www.google.com.mx/search*",
   ],
   runAt: "document_start",
   async main() {
@@ -53,6 +68,10 @@ export default defineContentScript({
 
     applyState(settings);
 
+    if (import.meta.env.DEV) {
+      setTimeout(() => devSelectorAudit(query, settings), 2000);
+    }
+
     browser.storage.onChanged.addListener((changes, area) => {
       if (area !== "sync" || !(STORAGE_KEY in changes)) return;
       loadSettings().then((newSettings) => {
@@ -82,9 +101,9 @@ function injectInitialHideStyle(): void {
 }
 
 /**
- * 根據目前 settings 建出封鎖用 CSS 字串（純函式）
+ * 收集目前 settings 啟用的所有頁面層級 selector（不含 autocomplete）
  */
-function buildBlockCSS(settings: BlocklistSettings): string {
+function collectBlockSelectors(settings: BlocklistSettings): string[] {
   const selectors: string[] = [];
 
   if (settings.blockTypes.images) {
@@ -97,10 +116,7 @@ function buildBlockCSS(settings: BlocklistSettings): string {
   }
 
   if (settings.blockTypes.thumbnails) {
-    selectors.push(
-      "#search img",
-      "#rcnt img",
-    );
+    selectors.push("#search img", "#rcnt img");
   }
 
   if (settings.blockTypes.videos) {
@@ -128,10 +144,43 @@ function buildBlockCSS(settings: BlocklistSettings): string {
     );
   }
 
-  // searchPreview 不在這裡 — 由 observeAutocomplete() 逐 option 判斷
+  return selectors;
+}
+
+/**
+ * 根據目前 settings 建出封鎖用 CSS 字串（純函式）
+ */
+function buildBlockCSS(settings: BlocklistSettings): string {
+  const selectors = collectBlockSelectors(settings);
   return selectors.length
     ? `${selectors.join(",\n")} { display: none !important; }`
     : "";
+}
+
+/**
+ * Dev only: 阻擋啟用 2 秒後檢查所有 selector 是否真的找到元素。
+ * 全部 0 命中通常代表 Google 改了 DOM，需要更新 collectBlockSelectors。
+ */
+function devSelectorAudit(query: string, settings: BlocklistSettings): void {
+  if (settings.paused || !shouldBlock(query, settings)) return;
+  const selectors = collectBlockSelectors(settings);
+  if (selectors.length === 0) return;
+  let total = 0;
+  for (const sel of selectors) {
+    try {
+      total += document.querySelectorAll(sel).length;
+    } catch {
+      // 無效 selector 略過，不應發生
+    }
+  }
+  if (total === 0) {
+    console.warn(
+      `[SIB dev] All ${selectors.length} block selectors matched 0 elements on this page. ` +
+        `Google may have rotated its DOM — check selectors in entrypoints/content/index.ts.`,
+    );
+  } else {
+    console.debug(`[SIB dev] Block selectors matched ${total} elements.`);
+  }
 }
 
 /**
