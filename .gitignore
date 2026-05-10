@@ -8,3 +8,5 @@ stats-*.json
 *.log
 .DS_Store
 .claude
+public/icon/*.svg
+public/icon/build.py
