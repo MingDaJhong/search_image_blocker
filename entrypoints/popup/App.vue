@@ -10,6 +10,7 @@ import {
   mergeSettings,
   STORAGE_KEY,
   PRESET_TEMPLATES,
+  DEFAULT_CATEGORIES,
   MAX_KEYWORD_LEN,
   MAX_LABEL_LEN,
   type Locale,
@@ -28,6 +29,7 @@ const {
   removeKeyword,
   addCategory,
   addCategoryFromPreset,
+  addCategoryFromDefault,
   removeCategory,
   setCatLabel,
   addCatKeyword,
@@ -49,6 +51,13 @@ const blockMatch = computed(() => {
 watch(loaded, async (isLoaded) => {
   if (!isLoaded) return;
   refreshStorageUsage();
+  // 截圖模式：popup 以分頁開啟並帶 ?q=<關鍵字> 時，跳過 tabs API
+  // 直接把該關鍵字當成「目前搜尋字串」，方便擷取阻擋 banner 畫面。
+  const overrideQ = new URL(location.href).searchParams.get("q");
+  if (overrideQ !== null) {
+    currentSearchQuery.value = overrideQ;
+    return;
+  }
   try {
     const tabs = await browser.tabs.query({
       active: true,
@@ -103,8 +112,25 @@ const availablePresets = computed(() => {
   }));
 });
 
+const availableDefaults = computed(() => {
+  const existingIds = new Set(settings.value.customCategories.map((c) => c.id));
+  const locale = settings.value.locale;
+  return DEFAULT_CATEGORIES.filter((d) => !existingIds.has(d.id)).map((d) => ({
+    id: d.id,
+    label: d.label[locale],
+  }));
+});
+
 function handleAddPreset(presetId: string) {
   const id = addCategoryFromPreset(presetId);
+  if (id) {
+    showAddCategory.value = false;
+    newCategoryName.value = "";
+  }
+}
+
+function handleRestoreDefault(defaultId: string) {
+  const id = addCategoryFromDefault(defaultId);
   if (id) {
     showAddCategory.value = false;
     newCategoryName.value = "";
@@ -636,6 +662,25 @@ function cancelImport() {
             @click="showAddCategory = !showAddCategory"
           >
             + {{ t.addCategoryBtn }}
+          </button>
+        </div>
+
+        <!-- 還原內建分類 -->
+        <div
+          v-if="showAddCategory && availableDefaults.length"
+          class="mb-2 flex flex-wrap items-center gap-1.5"
+        >
+          <span class="text-xs text-gray-500 dark:text-gray-400">
+            {{ t.restoreDefaultsLabel }}
+          </span>
+          <button
+            v-for="d in availableDefaults"
+            :key="d.id"
+            type="button"
+            class="px-2 py-0.5 text-xs bg-gray-100 dark:bg-gray-800 hover:bg-primary-100 dark:hover:bg-primary-900/40 text-gray-700 dark:text-gray-300 rounded-md border border-gray-200 dark:border-gray-700"
+            @click="handleRestoreDefault(d.id)"
+          >
+            + {{ d.label }}
           </button>
         </div>
 

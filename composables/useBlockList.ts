@@ -9,6 +9,7 @@
  */
 import { ref, watch } from 'vue'
 import {
+  DEFAULT_CATEGORIES,
   DEFAULT_SETTINGS,
   MAX_KEYWORD_LEN,
   MAX_LABEL_LEN,
@@ -148,6 +149,25 @@ export function useBlockList() {
     return preset.id
   }
 
+  /**
+   * 還原使用者誤刪的內建分類（insects / reptiles / parasites）。
+   * 跟 addCategoryFromPreset 對稱，但讀的是 DEFAULT_CATEGORIES。
+   */
+  function addCategoryFromDefault(defaultId: string): string {
+    const def = DEFAULT_CATEGORIES.find((d) => d.id === defaultId)
+    if (!def) return ''
+    if (settings.value.customCategories.some((c) => c.id === def.id)) return def.id
+    const locale = settings.value.locale
+    settings.value.customCategories.push({
+      id: def.id,
+      label: def.label[locale],
+      keywords: [...def.keywords[locale]],
+    })
+    settings.value.categoryOrder.push(def.id)
+    settings.value.enabledCategories.push(def.id)
+    return def.id
+  }
+
   function removeCategory(id: string) {
     settings.value.customCategories = settings.value.customCategories.filter((c) => c.id !== id)
     settings.value.categoryOrder = settings.value.categoryOrder.filter((i) => i !== id)
@@ -186,6 +206,7 @@ export function useBlockList() {
     removeKeyword,
     addCategory,
     addCategoryFromPreset,
+    addCategoryFromDefault,
     removeCategory,
     setCatLabel,
     addCatKeyword,

@@ -95,7 +95,7 @@ pnpm zip
 - [~] **關鍵字 enable / disable**：評估後決定不做 — 全域 Pause 已涵蓋「臨時想搜被擋的詞」場景；per-keyword toggle 與既有 add / remove 模式並存會讓心智模型混亂（同一頁面：分類用 toggle、關鍵字用 toggle + 刪除？）。若未來再有需求，較好方向是「關鍵字組合的快速匯入 / 匯出」
 - [x] **輸入驗證 + 重複回饋**：`addKeyword` / `addCatKeyword` 回傳 `'added' | 'duplicate' | 'empty'`，UI 收到非 `'added'` 時 input 邊框轉紅並顯示對應提示文案，2.5 秒後自動消失
 - [x] **autocomplete observer 效能**：`requestAnimationFrame` debounce 合併同 frame mutation；listbox 不存在時提早返回；觀察根縮小到搜尋框 `<form>`
-- [ ] **「還原預設分類」按鈕**：`DEFAULT_CATEGORIES` 已在程式碼中，使用者誤刪後給一鍵恢復入口
+- [x] **「還原預設分類」按鈕**：新增分類表單裡的「+ 還原 <分類名>」chip，僅當該內建分類目前不存在時才顯示，點擊用當前 locale 重新 seed `label` / `keywords`
 
 ### P2 — Nice to have
 
@@ -116,7 +116,7 @@ pnpm zip
 - [x] 沒有使用 regex，無 ReDoS 風險
 - [x] 完整 icon（16/32/48/96/128 px）
 - [x] 使用者輸入長度上限：`MAX_KEYWORD_LEN = 50` / `MAX_LABEL_LEN = 30`，input 端 `maxlength` + composable 端 `'too_long'` 雙層擋；`loadSettings` / `parseImport` 也過濾過長字串，防 storage 被惡意 import 灌爆
-- [ ] 確認 `wxt zip` 產出不含 `.DS_Store` 或系統垃圾檔（`.gitignore` 有，但 build flow 不一定會自動過濾）
+- [x] 確認 `wxt zip` 產出不含 `.DS_Store` 或系統垃圾檔：WXT build flow 自動過濾，已用 `unzip -l | grep DS_Store` 驗證
 
 ## Known issues / 長期維護
 

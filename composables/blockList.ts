@@ -59,7 +59,7 @@ export const STORAGE_KEY = 'sib_settings'
 export const MAX_KEYWORD_LEN = 50
 export const MAX_LABEL_LEN = 30
 
-const DEFAULT_CATEGORIES: DefaultCategory[] = [
+export const DEFAULT_CATEGORIES: DefaultCategory[] = [
   {
     id: 'insects',
     label: { 'zh-TW': '昆蟲 / 節肢動物', en: 'Insects / Arthropods' },

@@ -13,13 +13,16 @@ export default defineConfig({
     startUrls: ['https://www.google.com/search?q=蝴蝶'],
   },
   manifest: {
-    name: 'Search Image Blocker',
-    description: '依關鍵字隱藏 Google 搜尋頁的圖片、影片區塊',
-    version: '0.0.1',
+    // 名稱與描述走 _locales/{zh_TW,en}/messages.json，
+    // CWS 與 chrome://extensions 會依使用者語系顯示對應翻譯
+    default_locale: 'zh_TW',
+    name: '__MSG_extName__',
+    description: '__MSG_extDescription__',
+    version: '1.0.0',
     permissions: ['storage'],
     host_permissions: GOOGLE_TLDS.map((tld) => `https://www.google.${tld}/*`),
     action: {
-      default_title: 'Search Image Blocker',
+      default_title: '__MSG_extName__',
     },
   },
 })

@@ -41,6 +41,7 @@ export const messages = {
     addCategoryBtn: "新增分類",
     newCategoryPlaceholder: "輸入分類名稱",
     presetsLabel: "或從範本：",
+    restoreDefaultsLabel: "或還原內建：",
     deleteCategoryBtn: "刪除此分類",
     saveError: "儲存失敗：設定空間已達上限，請刪除部分分類或關鍵字。",
     exportSettings: "匯出設定",
@@ -103,6 +104,7 @@ export const messages = {
     addCategoryBtn: "Add category",
     newCategoryPlaceholder: "Category name",
     presetsLabel: "Or from preset:",
+    restoreDefaultsLabel: "Or restore built-in:",
     deleteCategoryBtn: "Delete this category",
     saveError:
       "Save failed: storage quota exceeded. Please remove some categories or keywords.",

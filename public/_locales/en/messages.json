@@ -1,0 +1,10 @@
+{
+  "extName": {
+    "message": "Search Image Blocker",
+    "description": "Extension display name"
+  },
+  "extDescription": {
+    "message": "Hide images, video cards & knowledge panels on Google Search by keyword. Zero data collection.",
+    "description": "Extension short description shown in Chrome Web Store and chrome://extensions"
+  }
+}
