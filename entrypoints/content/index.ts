@@ -116,17 +116,42 @@ function collectBlockSelectors(settings: BlocklistSettings): string[] {
   }
 
   if (settings.blockTypes.thumbnails) {
-    selectors.push("#search img", "#rcnt img");
+    // 排除：favicon 容器（cite、span.VuuXrf、.byrV5b、.TbwUpd、.XNo5Ab、.eqA2re）
+    // 與影片卡片內部圖片（交給 videos 處理），避免擋到站點 logo 或重複擋影片卡。
+    // 排除清單是 Google class 名稱常見模式的猜測，可能需隨 DOM rotation 維護。
+    const excludeFaviconsAndVideos =
+      ':is(cite img, .VuuXrf img, .byrV5b img, .TbwUpd img, .XNo5Ab, .eqA2re, video-voyager *, [data-attrid*="Video"] *, [data-vido] *, [jscontroller="rTuANe"] *)';
+    selectors.push(
+      `#search img:not(${excludeFaviconsAndVideos})`,
+      `#rcnt img:not(${excludeFaviconsAndVideos})`,
+    );
   }
 
   if (settings.blockTypes.videos) {
-    selectors.push(
+    // 只擋影片卡內部的「預覽圖 + <video> + 背景影像」，不擋整張卡，保留文字標題/來源/日期。
+    // <video> 用 display:none 後瀏覽器不會載入，hover 預覽自動失效。
+    //
+    // 影片卡容器辨識：
+    //   [jscontroller="rTuANe"]  — 知識面板影片 + 主搜尋結果區影片區「都」用這個 controller
+    //   [data-attrid*="Video"]   — 知識面板的 VisualDigestVideoResult / 舊版 VideoObject
+    //   video-voyager / [data-vido] — 舊版 layout 的 fallback
+    const videoCardContainers = [
+      '[jscontroller="rTuANe"]',
+      'div[data-attrid*="Video"]',
       "video-voyager",
-      'div[data-attrid*="VideoObject"]',
-      'div[jsname][data-hveid] a[href*="youtube.com"]',
       "div[data-vido]",
-      'div[jsname="UWckNb"][href*="youtube.com"]',
-      'a[href*="youtube.com/watch"]',
+    ];
+    for (const card of videoCardContainers) {
+      selectors.push(
+        `${card} img`,
+        `${card} video`,
+        `${card} picture`,
+        `${card} [style*="background-image"]`,
+      );
+    }
+    selectors.push(
+      'a[href*="youtube.com/watch"] img',
+      'a[href*="youtube.com/watch"] video',
     );
   }
 
