@@ -93,7 +93,9 @@ function injectInitialHideStyle(): void {
     /* 暫時通殺所有圖片橫幅、影片卡 — 等 settings 載入後再決定 */
     g-scrolling-carousel,
     div[data-attrid*="kc:/"][data-attrid*="image"],
-    div[jsname][data-hveid] g-scrolling-carousel {
+    div[jsname][data-hveid] g-scrolling-carousel,
+    div[jsname="tX7jT"] img,
+    div[jsname="tX7jT"] video {
       visibility: hidden !important;
     }
   `;
@@ -140,6 +142,7 @@ function collectBlockSelectors(settings: BlocklistSettings): string[] {
       'div[data-attrid*="Video"]',
       "video-voyager",
       "div[data-vido]",
+      'div[jsname="tX7jT"]',
     ];
     for (const card of videoCardContainers) {
       selectors.push(
