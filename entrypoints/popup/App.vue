@@ -603,6 +603,16 @@ function cancelImport() {
             class="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1.5 rounded"
           >
             <input
+              v-model="settings.blockTypes.imageFilterBar"
+              type="checkbox"
+              class="accent-primary-600"
+            />
+            {{ t.blockImageFilterBar }}
+          </label>
+          <label
+            class="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1.5 rounded"
+          >
+            <input
               v-model="settings.blockTypes.images"
               type="checkbox"
               class="accent-primary-600"

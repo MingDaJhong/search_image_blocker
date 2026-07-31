@@ -95,7 +95,8 @@ function injectInitialHideStyle(): void {
     div[data-attrid*="kc:/"][data-attrid*="image"],
     div[jsname][data-hveid] g-scrolling-carousel,
     div[jsname="tX7jT"] img,
-    div[jsname="tX7jT"] video {
+    div[jsname="tX7jT"] video,
+    [role="list"] [role="listitem"] a[role="link"][href*="/search"] img {
       visibility: hidden !important;
     }
   `;
@@ -155,6 +156,25 @@ function collectBlockSelectors(settings: BlocklistSettings): string[] {
     selectors.push(
       'a[href*="youtube.com/watch"] img',
       'a[href*="youtube.com/watch"] video',
+    );
+  }
+
+  if (settings.blockTypes.imageFilterBar) {
+    // 圖片分頁頂端的相關搜尋 chips（「卡通 / 可愛 / 手繪 …」）——只拿掉縮圖，保留文案。
+    // DOM: a[role="link"] > div            ← chip 外框，文案也在這層裡面，整塊隱藏會連字一起消失
+    //                        ├─ span > div > div > img   ← 縮圖 → 目標
+    //                        └─ span 文案                ← 保留
+    // `:has(> img):not(:has(> :not(img)))` = 直接子元素只有 <img> 的純圖片容器，
+    // 任何夾帶文字節點以外元素的層級都不會被匹配，Google 改結構也不會誤殺整個 chip。
+    // :has() 用 :is() 包起來，舊瀏覽器不支援時只讓這一支失效，不會整條 rule 作廢。
+    // [href*="/search"] 把範圍收在「點了會再搜尋」的 chip，避開指向外站的 carousel 卡片。
+    const chipLink = '[role="list"] [role="listitem"] a[role="link"][href*="/search"]';
+    selectors.push(
+      `${chipLink} :is(:has(> img):not(:has(> :not(img))))`,
+      `${chipLink} img`,
+      `${chipLink} g-img`,
+      `${chipLink} picture`,
+      `${chipLink} [style*="background-image"]`,
     );
   }
 

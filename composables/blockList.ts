@@ -27,6 +27,8 @@ export interface BlocklistSettings {
     knowledgePanel: boolean
     /** 搜尋框 autocomplete 下拉建議裡的縮圖 */
     searchPreview: boolean
+    /** 圖片分頁頂端篩選列（相關搜尋 chips）的縮圖 */
+    imageFilterBar: boolean
   }
   /** 使用者自訂的觸發關鍵字 */
   keywords: string[]
@@ -132,6 +134,7 @@ export const DEFAULT_SETTINGS: BlocklistSettings = {
     relatedQuestions: false,
     knowledgePanel: false,
     searchPreview: true,
+    imageFilterBar: true,
   },
   keywords: [],
   enabledCategories: ['insects'],
