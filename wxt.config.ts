@@ -1,14 +1,17 @@
 import { defineConfig } from 'wxt'
-
-// 與 entrypoints/content/index.ts 的 matches 同步維護
-const GOOGLE_TLDS = [
-  'com', 'com.tw', 'com.hk', 'co.jp', 'co.kr', 'com.sg',
-  'co.uk', 'com.au', 'ca', 'co.in',
-  'de', 'fr', 'es', 'it', 'com.br', 'com.mx',
-]
+import { GOOGLE_HOST_PERMISSIONS } from './composables/googleTlds'
 
 export default defineConfig({
   modules: ['@wxt-dev/module-vue'],
+  vite: () => ({
+    build: {
+      // 頁面提示的圖示要被內嵌成 data URI，不能變成 emit 出來的檔案 ——
+      // 後者需要列進 web_accessible_resources，等於讓 google.com 可以探測
+      // 這個擴充功能是否安裝。預設上限 4 KB 對 48px 圖示（3.9 KB）太貼邊，
+      // 日後重算圖示稍微變大就會靜默翻轉這個取捨。
+      assetsInlineLimit: 8192,
+    },
+  }),
   runner: {
     startUrls: ['https://www.google.com/search?q=蝴蝶'],
   },
@@ -20,7 +23,7 @@ export default defineConfig({
     description: '__MSG_extDescription__',
     version: '1.0.2',
     permissions: ['storage'],
-    host_permissions: GOOGLE_TLDS.map((tld) => `https://www.google.${tld}/*`),
+    host_permissions: GOOGLE_HOST_PERMISSIONS,
     action: {
       default_title: '__MSG_extName__',
     },

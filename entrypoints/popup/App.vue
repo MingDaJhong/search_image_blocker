@@ -5,21 +5,22 @@ import { browser } from "wxt/browser";
 import {
   useBlockList,
   findBlockMatch,
+  findAllowMatch,
   shouldBlock,
   parseImport,
   mergeSettings,
   STORAGE_KEY,
   PRESET_TEMPLATES,
   DEFAULT_CATEGORIES,
-  MAX_KEYWORD_LEN,
   MAX_LABEL_LEN,
   type Locale,
   type Category,
-  type AddKeywordResult,
   type BlocklistSettings,
 } from "@/composables/useBlockList";
+import { isGoogleSearchUrl } from "@/composables/googleTlds";
 import { messages, type Messages } from "./i18n";
 import CategoryDetail from "./CategoryDetail.vue";
+import KeywordSection from "./KeywordSection.vue";
 
 const {
   settings,
@@ -27,6 +28,8 @@ const {
   saveError,
   addKeyword,
   removeKeyword,
+  addAllowKeyword,
+  removeAllowKeyword,
   addCategory,
   addCategoryFromPreset,
   addCategoryFromDefault,
@@ -35,7 +38,6 @@ const {
   addCatKeyword,
   removeCatKeyword,
 } = useBlockList();
-const newKeyword = ref("");
 const expandedCategory = ref<string | null>(null);
 
 // 目前 active tab 的搜尋字串（null = 非 Google 搜尋頁）
@@ -46,6 +48,12 @@ const blockMatch = computed(() => {
   if (query === null || !loaded.value) return null;
   if (!shouldBlock(query, settings.value)) return null;
   return findBlockMatch(query, settings.value);
+});
+// 命中例外而放行時，讓 UI 說得出「為什麼沒擋」——與 blockMatch 互斥
+const allowMatch = computed(() => {
+  const query = currentSearchQuery.value;
+  if (query === null || !loaded.value) return null;
+  return findAllowMatch(query, settings.value);
 });
 
 watch(loaded, async (isLoaded) => {
@@ -64,35 +72,52 @@ watch(loaded, async (isLoaded) => {
       currentWindow: true,
     });
     const url = tabs[0]?.url ? new URL(tabs[0].url) : null;
-    if (
-      !url ||
-      !url.hostname.includes("google.com") ||
-      url.pathname !== "/search"
-    )
-      return;
+    if (!url || !isGoogleSearchUrl(url)) return;
     currentSearchQuery.value = url.searchParams.get("q") ?? "";
   } catch {
     // tabs API 不可用或 URL 無法存取
   }
 });
 
-// 視圖狀態：null = 主畫面；string = 該 category id 的詳情頁
-const detailCategoryId = ref<string | null>(null);
+/**
+ * Popup 只有一個視窗，靠這個狀態決定顯示哪一頁。
+ * 用 discriminated union 而不是多個布林，避免出現「兩頁同時開著」的無效狀態。
+ */
+type PopupView =
+  | { name: "main" }
+  | { name: "category"; id: string }
+  | { name: "allowKeywords" };
+
+const view = ref<PopupView>({ name: "main" });
+const isMain = computed(() => view.value.name === "main");
+
 const detailCategory = computed<Category | null>(() => {
-  const id = detailCategoryId.value;
-  if (!id) return null;
+  if (view.value.name !== "category") return null;
+  const id = view.value.id;
   return settings.value.customCategories.find((c) => c.id === id) ?? null;
 });
+
 
 // 新增分類表單狀態
 const showAddCategory = ref(false);
 const newCategoryName = ref("");
 
+/**
+ * 分類在別的裝置被刪掉時，storage 同步過來會讓 detailCategory 變成 null。
+ * 停在一個沒有內容的子頁沒有意義，直接退回主畫面。
+ */
+watch(detailCategory, (cat) => {
+  if (loaded.value && view.value.name === "category" && !cat) backToMain();
+});
+
 function openCategory(id: string) {
-  detailCategoryId.value = id;
+  view.value = { name: "category", id };
 }
-function closeCategory() {
-  detailCategoryId.value = null;
+function openAllowKeywords() {
+  view.value = { name: "allowKeywords" };
+}
+function backToMain() {
+  view.value = { name: "main" };
 }
 function handleAddCategory() {
   const id = addCategory(newCategoryName.value);
@@ -165,6 +190,20 @@ const orderedCategories = computed<Category[]>({
 
 const t = computed<Messages>(() => messages[settings.value.locale]);
 
+/** 子頁 header 的標題（主畫面時不會用到） */
+const detailTitle = computed(() =>
+  view.value.name === "allowKeywords"
+    ? t.value.allowKeywordsTitle
+    : (detailCategory.value?.label ?? ""),
+);
+
+/** 主畫面入口列的摘要，格式與分類列一致 */
+const allowKeywordsPreview = computed(() => {
+  const list = settings.value.allowKeywords;
+  if (list.length === 0) return "";
+  return list.slice(0, 3).join(t.value.keywordSep) + (list.length > 3 ? "…" : "");
+});
+
 // theme 變動時：套 dark class、寫 localStorage cache（給下次 popup 開啟時 main.ts 同步讀）
 watch(
   () => settings.value.theme,
@@ -174,23 +213,6 @@ watch(
   },
   { immediate: true },
 );
-
-const newKeywordError = ref<AddKeywordResult | null>(null);
-let newKeywordErrorTimer = 0;
-
-function handleAdd() {
-  const result = addKeyword(newKeyword.value);
-  if (result === "added") {
-    newKeyword.value = "";
-    newKeywordError.value = null;
-    return;
-  }
-  clearTimeout(newKeywordErrorTimer);
-  newKeywordError.value = result;
-  newKeywordErrorTimer = window.setTimeout(() => {
-    newKeywordError.value = null;
-  }, 2500);
-}
 
 function toggleExpand(id: string) {
   expandedCategory.value = expandedCategory.value === id ? null : id;
@@ -358,7 +380,7 @@ function cancelImport() {
         </div>
       </div>
     </div>
-    <header v-if="!detailCategory" class="flex items-center gap-2 mb-4">
+    <header v-if="isMain" class="flex items-center gap-2 mb-4">
       <img class="w-10 h-10" src="/icon/128.png" alt="logo" />
       <div class="flex-1 min-w-0">
         <h1 class="text-base font-semibold leading-tight truncate">
@@ -490,7 +512,7 @@ function cancelImport() {
         :title="t.backAria"
         :aria-label="t.backAria"
         class="w-7 h-7 rounded hover:bg-gray-100 dark:hover:bg-gray-800 flex items-center justify-center"
-        @click="closeCategory"
+        @click="backToMain"
       >
         <svg
           viewBox="0 0 20 20"
@@ -503,7 +525,7 @@ function cancelImport() {
         </svg>
       </button>
       <h1 class="flex-1 min-w-0 text-base font-semibold leading-tight truncate">
-        {{ detailCategory.label }}
+        {{ detailTitle }}
       </h1>
     </header>
 
@@ -514,7 +536,7 @@ function cancelImport() {
       {{ t.loading }}
     </div>
 
-    <template v-else-if="!detailCategory">
+    <template v-else-if="isMain">
       <!-- 暫停 banner -->
       <div
         v-if="settings.paused"
@@ -551,10 +573,16 @@ function cancelImport() {
       >
         {{ t.blockedByMsg(blockMatch.keyword, blockMatch.categoryLabel) }}
       </div>
+      <div
+        v-else-if="allowMatch"
+        class="mb-4 px-3 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md text-xs text-green-700 dark:text-green-300"
+      >
+        {{ t.allowedByMsg(allowMatch) }}
+      </div>
 
       <!-- 全域開關 -->
       <section
-        class="mb-4 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
+        class="mb-6 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
       >
         <label class="flex items-center justify-between cursor-pointer">
           <div>
@@ -569,10 +597,42 @@ function cancelImport() {
             class="w-4 h-4 accent-primary-600"
           />
         </label>
+
+        <div class="my-2.5 border-t border-gray-200 dark:border-gray-700" />
+
+        <label class="flex items-center justify-between cursor-pointer">
+          <div>
+            <div class="text-sm font-medium">{{ t.perResultBlock }}</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400">
+              {{ t.perResultBlockDesc }}
+            </div>
+          </div>
+          <input
+            v-model="settings.perResultBlock"
+            type="checkbox"
+            class="w-4 h-4 accent-primary-600"
+          />
+        </label>
+
+        <div class="my-2.5 border-t border-gray-200 dark:border-gray-700" />
+
+        <label class="flex items-center justify-between cursor-pointer">
+          <div>
+            <div class="text-sm font-medium">{{ t.pageIndicator }}</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400">
+              {{ t.pageIndicatorDesc }}
+            </div>
+          </div>
+          <input
+            v-model="settings.pageIndicator"
+            type="checkbox"
+            class="w-4 h-4 accent-primary-600"
+          />
+        </label>
       </section>
 
       <!-- 區塊類型 -->
-      <section class="mb-4">
+      <section class="mb-6">
         <h2
           class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2"
         >
@@ -659,7 +719,7 @@ function cancelImport() {
       </div>
 
       <!-- 觸發分類 -->
-      <section class="mb-4">
+      <section class="mb-6">
         <div class="flex items-center justify-between mb-2">
           <h2
             class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide"
@@ -840,74 +900,53 @@ function cancelImport() {
         </draggable>
       </section>
 
-      <!-- 自訂關鍵字 -->
-      <section>
+      <!-- 例外關鍵字：主畫面只留入口，清單在子頁（57 條 chip 會把 popup 撐爆） -->
+      <section class="mb-6">
         <h2
           class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2"
         >
-          {{ t.customKeywordsTitle }}
+          {{ t.allowKeywordsTitle }}
         </h2>
-
-        <form
-          :class="['flex gap-2', newKeywordError ? 'mb-0' : 'mb-2']"
-          @submit.prevent="handleAdd"
+        <button
+          type="button"
+          class="w-full flex items-center gap-2 p-2 rounded border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 text-left transition-colors"
+          @click="openAllowKeywords"
         >
-          <input
-            v-model="newKeyword"
-            type="text"
-            :placeholder="t.keywordPlaceholder"
-            :maxlength="MAX_KEYWORD_LEN"
-            :class="[
-              'flex-1 px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:border-transparent dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500',
-              newKeywordError
-                ? 'border-red-400 dark:border-red-600 focus:ring-red-400'
-                : 'border-gray-300 dark:border-gray-700 focus:ring-primary-500',
-            ]"
-            @input="newKeywordError = null"
-          />
-          <button
-            type="submit"
-            class="px-3 py-1.5 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors"
+          <span
+            class="flex-1 min-w-0 truncate text-xs text-gray-500 dark:text-gray-400"
           >
-            {{ t.addBtn }}
-          </button>
-        </form>
-        <p
-          v-if="newKeywordError"
-          class="mt-1 mb-1 text-xs text-red-500 dark:text-red-400"
-        >
-          {{
-            newKeywordError === "duplicate" ? t.errorDuplicate : newKeywordError === "too_long" ? t.errorTooLong : t.errorEmpty
-          }}
-        </p>
-
-        <div
-          v-if="settings.keywords.length === 0"
-          class="text-xs text-gray-400 dark:text-gray-500 text-center py-3"
-        >
-          {{ t.noKeywords }}
-        </div>
-
-        <ul v-else class="flex flex-wrap gap-1.5">
-          <li
-            v-for="kw in settings.keywords"
-            :key="kw"
-            class="inline-flex items-center gap-1 px-2 py-1 bg-primary-50 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 text-xs rounded-md max-w-[10rem] overflow-hidden"
+            <template v-if="settings.allowKeywords.length">
+              {{ allowKeywordsPreview }} ·
+              {{ t.keywordCount(settings.allowKeywords.length) }}
+            </template>
+            <template v-else>{{ t.noAllowKeywords }}</template>
+          </span>
+          <svg
+            viewBox="0 0 20 20"
+            class="w-4 h-4 fill-current text-gray-400 dark:text-gray-500 shrink-0"
+            aria-hidden="true"
           >
-            <span class="truncate" :title="kw">{{ kw }}</span>
-            <button
-              class="hover:text-primary-900 dark:hover:text-primary-100 font-bold leading-none"
-              :aria-label="t.removeAria(kw)"
-              @click="removeKeyword(kw)"
-            >
-              ×
-            </button>
-          </li>
-        </ul>
+            <path
+              d="M7.05 4.05a1 1 0 0 1 1.414 0l5.243 5.243a1 1 0 0 1 0 1.414L8.464 15.95a1 1 0 0 1-1.414-1.414L11.586 10 7.05 5.464a1 1 0 0 1 0-1.414Z"
+            />
+          </svg>
+        </button>
       </section>
 
+      <!-- 自訂關鍵字 -->
+      <KeywordSection
+        :title="t.customKeywordsTitle"
+        :keywords="settings.keywords"
+        :placeholder="t.keywordPlaceholder"
+        :empty-text="t.noKeywords"
+        :t="t"
+        :add="addKeyword"
+        :remove="removeKeyword"
+        tone="block"
+      />
+
       <footer
-        class="mt-4 pt-3 border-t border-gray-200 dark:border-gray-800 text-xs text-gray-400 dark:text-gray-500"
+        class="mt-6 pt-3 border-t border-gray-200 dark:border-gray-800 text-xs text-gray-400 dark:text-gray-500"
       >
         <!-- 儲存配額進度條 -->
         <div v-if="storageBytes > 0" class="mb-2">
@@ -956,14 +995,27 @@ function cancelImport() {
 
     <!-- 分類詳情頁 -->
     <CategoryDetail
-      v-else
+      v-else-if="detailCategory"
       :category="detailCategory"
       :t="t"
       :set-cat-label="setCatLabel"
       :add-cat-keyword="addCatKeyword"
       :remove-cat-keyword="removeCatKeyword"
       :remove-category="removeCategory"
-      @deleted="closeCategory"
+      @deleted="backToMain"
+    />
+
+    <!-- 例外關鍵字子頁（標題已在 header，這裡不重複下標題） -->
+    <KeywordSection
+      v-else-if="view.name === 'allowKeywords'"
+      :keywords="settings.allowKeywords"
+      :placeholder="t.allowKeywordPlaceholder"
+      :empty-text="t.noAllowKeywords"
+      :hint="t.allowKeywordsHint"
+      :t="t"
+      :add="addAllowKeyword"
+      :remove="removeAllowKeyword"
+      tone="allow"
     />
   </div>
 </template>

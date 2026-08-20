@@ -32,12 +32,30 @@ export interface BlocklistSettings {
   }
   /** 使用者自訂的觸發關鍵字 */
   keywords: string[]
+  /**
+   * 例外關鍵字：命中的查詢一律放行，優先於 keywords / 分類。
+   * 首次安裝時依 locale 由 seedDefaultAllowKeywords() 帶入一份策展清單。
+   */
+  allowKeywords: string[]
   /** 已啟用的分類包 ID */
   enabledCategories: string[]
   /** 分類包顯示順序（ID 陣列，可被使用者拖曳改變） */
   categoryOrder: string[]
   /** 所有觸發分類（內建預設與使用者新增都存這裡，可自由刪除） */
   customCategories: Category[]
+  /**
+   * 搜尋字沒命中時，改逐筆檢查搜尋結果的文字，只隱藏命中那一筆的圖片。
+   *
+   * 補的是 query 層級阻擋的盲點：搜「我家牆上這是什麼」時 query 一個關鍵字
+   * 都不會命中，但結果標題全是「蜘蛛」—— 那正是最需要保護的時刻。
+   * 與 query 層級疊加，不取代。
+   */
+  perResultBlock: boolean
+  /**
+   * 在搜尋頁左下角顯示封鎖提示（隱藏了幾個區塊、命中哪個關鍵字、一鍵本頁顯示）。
+   * 預設開啟 —— 這個功能存在的意義就是讓阻擋不再無聲，預設關掉等於沒做。
+   */
+  pageIndicator: boolean
   /** popup 顯示語系 */
   locale: Locale
   /** popup 主題 */
@@ -137,9 +155,12 @@ export const DEFAULT_SETTINGS: BlocklistSettings = {
     imageFilterBar: true,
   },
   keywords: [],
+  allowKeywords: [],
   enabledCategories: ['insects'],
   categoryOrder: [],
   customCategories: [],
+  perResultBlock: true,
+  pageIndicator: true,
   locale: 'zh-TW',
   theme: 'light',
 }
@@ -163,6 +184,56 @@ export function seedDefaultCategories(locale: Locale): Category[] {
   }))
 }
 
+/**
+ * 內建例外關鍵字：常見的「字面上含有被擋關鍵字、但內容完全無關」的複合詞。
+ *
+ * 中文特別需要這個。matchKeyword 的詞邊界規則救得了拉丁字母（`moth` 不再命中
+ * `mother`），但中文沒有詞邊界可用 —— `蛇` 一定會命中 `蛇年運勢`、`蟬` 一定會
+ * 命中 `蟬聯冠軍`。唯一的解法就是列舉例外。
+ *
+ * 收錄標準（兩條都要成立）：
+ *   1. 是常見查詢，不是冷僻詞
+ *   2. 搜出來的圖片確實不會出現使用者想避開的東西
+ * 已經被詞邊界規則擋掉的不收（例如 `beetlejuice`、`hard boiled` 本來就不會命中）。
+ * `composables/blockList.test.ts` 有一條測試會擋下這種死條目。
+ */
+const DEFAULT_ALLOW_KEYWORDS: Record<Locale, string[]> = {
+  'zh-TW': [
+    '蟬聯', '蛇年', '蛇果', '蛇形', '蛇皮包', '打草驚蛇',
+    '蟲洞', '甲蟲車', '螞蟻上樹',
+    '蝴蝶結', '蝴蝶效應', '蝴蝶刀',
+    '鱷魚牌', '鱷魚夾', '壁虎功', '烏龜車', '蝸牛霜', '蜈蚣辮',
+    '響尾蛇飛彈', '蜘蛛人',
+    '癌症險', '癌症保險', '腫瘤科', '手術費用', '手術同意書', '暴力美學',
+  ],
+  en: [
+    'flea market', 'snake case', 'snake game',
+    'spider chart', 'spider diagram', 'spider plot', 'spider solitaire', 'spider man',
+    'feather boa', 'worm gear', 'vw beetle', 'tick tock',
+    'charlotte hornets', 'dodge viper', 'cobra kai', 'mamba mentality',
+    'turtle neck', 'snail mail', 'url slug', 'crocodile dundee', 'alligator clip',
+    'wound up', 'boil water', 'rash decision', 'wart hog', 'blister pack',
+    'in stitches', 'al gore', 'gore-tex', 'corpse bride', 'bloody mary',
+  ],
+}
+
+/** 依 locale seed 出初始的例外關鍵字清單 */
+export function seedDefaultAllowKeywords(locale: Locale): string[] {
+  return [...DEFAULT_ALLOW_KEYWORDS[locale]]
+}
+
+/**
+ * 儲存層的關鍵字過濾條件：必須是字串、去掉空白後非空、且不超長。
+ *
+ * 「非空」這條是必要的：空字串在任何 substring 比對下都會命中所有查詢，等於
+ * 偷偷開啟全域阻擋。正常 UI 流程進不來（addKeyword 會擋），但損毀的 storage
+ * 或惡意的匯入檔可以。matchKeyword 內另有一道相同的防線 —— 這裡是把髒資料
+ * 擋在儲存層外，兩道都留著。
+ */
+export function isValidKeyword(k: unknown): k is string {
+  return typeof k === 'string' && k.trim().length > 0 && k.length <= MAX_KEYWORD_LEN
+}
+
 export function normalizeCategories(stored: unknown): Category[] {
   if (!Array.isArray(stored)) return []
   return stored
@@ -177,7 +248,7 @@ export function normalizeCategories(stored: unknown): Category[] {
     .map((c) => ({
       id: c.id,
       label: c.label,
-      keywords: (c.keywords as unknown[]).filter((k): k is string => typeof k === 'string' && k.length <= MAX_KEYWORD_LEN),
+      keywords: (c.keywords as unknown[]).filter(isValidKeyword),
     }))
 }
 
@@ -261,11 +332,22 @@ export async function loadSettings(): Promise<BlocklistSettings> {
           : {}),
       },
       keywords: Array.isArray(raw.keywords)
-        ? (raw.keywords as unknown[]).filter((k): k is string => typeof k === 'string' && k.length <= MAX_KEYWORD_LEN)
+        ? (raw.keywords as unknown[]).filter(isValidKeyword)
         : [...DEFAULT_SETTINGS.keywords],
+      // 遷移：舊版沒有這個欄位，undefined 代表「還沒帶過內建例外」→ seed 一份。
+      // 已經是陣列（即使是空的）代表使用者可能刻意清空，尊重它、不要塞回去。
+      allowKeywords: Array.isArray(raw.allowKeywords)
+        ? (raw.allowKeywords as unknown[]).filter(isValidKeyword)
+        : seedDefaultAllowKeywords(locale),
       enabledCategories,
       categoryOrder: normalizeCategoryOrder(raw.categoryOrder, categoryIds),
       customCategories: categories,
+      perResultBlock:
+        typeof raw.perResultBlock === 'boolean'
+          ? raw.perResultBlock
+          : DEFAULT_SETTINGS.perResultBlock,
+      pageIndicator:
+        typeof raw.pageIndicator === 'boolean' ? raw.pageIndicator : DEFAULT_SETTINGS.pageIndicator,
       locale,
       theme: raw.theme === 'light' || raw.theme === 'dark' ? raw.theme : detectDefaultTheme(),
     }
@@ -276,6 +358,7 @@ export async function loadSettings(): Promise<BlocklistSettings> {
     return {
       ...DEFAULT_SETTINGS,
       keywords: [...DEFAULT_SETTINGS.keywords],
+      allowKeywords: seedDefaultAllowKeywords(locale),
       enabledCategories: [...DEFAULT_SETTINGS.enabledCategories],
       categoryOrder: categories.map((c) => c.id),
       customCategories: categories,
@@ -302,16 +385,58 @@ export async function saveSettings(settings: BlocklistSettings): Promise<boolean
 }
 
 /**
+ * 關鍵字只由這些字元組成時，代表它屬於「用空白斷詞」的語言，可以做詞邊界比對。
+ * 反之（中日韓等）沒有詞邊界可判斷，只能退回 substring。
+ */
+const WORD_DELIMITED = /^[\p{Script=Latin}\p{Script=Cyrillic}\p{Script=Greek}\d\s'\-.]+$/u
+/** 詞內字元 — 命中位置前後若是這些字元，代表切在詞中間，不算命中 */
+const WORD_CHAR = /[\p{L}\p{N}]/u
+/** 後方允許的簡單複數形，讓 `moth` 仍能命中 `moths` / `boxes` */
+const PLURAL_SUFFIX = /^(es|s)/
+
+/**
+ * 判斷 keyword 是否出現在 haystack 中，依關鍵字所屬的文字系統採用不同規則。
+ *
+ * 這裡不能用單純的 substring：`moth` 會命中 `mother's day gift`、`boa` 會命中
+ * `keyboard shortcuts`、`mite` 會命中 `limited edition`、`rash` 會命中 `car crash`
+ * ——結果是使用者搜一個完全無關的詞，整頁圖片無故消失，而且沒有任何提示。
+ *
+ * - **拉丁 / 西里爾 / 希臘字母關鍵字**：前緣必須是詞邊界，後緣是詞邊界或簡單複數。
+ * - **CJK 等無詞邊界的關鍵字**：維持 substring。中文的誤判（蟬聯、蛇年、螞蟻上樹…）
+ *   本質上要靠「例外關鍵字」清單解，不是靠比對規則。
+ *
+ * 刻意不把使用者輸入組成 regex：那有 ReDoS 風險，而 indexOf + 前後字元檢查就夠了。
+ */
+export function matchKeyword(haystack: string, keyword: string): boolean {
+  // 空字串會被 String.includes 視為命中所有內容，等同全域阻擋 —— 一律不算命中
+  if (!keyword) return false
+
+  const hay = haystack.toLowerCase()
+  const needle = keyword.toLowerCase()
+
+  if (!WORD_DELIMITED.test(needle)) return hay.includes(needle)
+
+  for (let i = hay.indexOf(needle); i >= 0; i = hay.indexOf(needle, i + 1)) {
+    if (WORD_CHAR.test(hay[i - 1] ?? '')) continue // 前緣切在詞中間
+    const after = hay.slice(i + needle.length).replace(PLURAL_SUFFIX, '')
+    if (!WORD_CHAR.test(after[0] ?? '')) return true
+  }
+  return false
+}
+
+/**
  * 判斷搜尋關鍵字是否命中黑名單
  */
 export function shouldBlock(query: string, settings: BlocklistSettings): boolean {
   if (settings.paused) return false
+  // globalBlock 刻意排在例外清單之前：它是「全部擋」的核彈按鈕，不該有洞。
+  // 想在 globalBlock 下臨時看某一頁，用 paused（本來就是為此存在的逃生口）。
   if (settings.globalBlock) return true
-  const lower = query.toLowerCase()
-  if (settings.keywords.some((k) => lower.includes(k.toLowerCase()))) return true
+  if (settings.allowKeywords.some((k) => matchKeyword(query, k))) return false
+  if (settings.keywords.some((k) => matchKeyword(query, k))) return true
   for (const catId of settings.enabledCategories) {
     const cat = settings.customCategories.find((c) => c.id === catId)
-    if (cat && cat.keywords.some((k) => lower.includes(k.toLowerCase()))) return true
+    if (cat && cat.keywords.some((k) => matchKeyword(query, k))) return true
   }
   return false
 }
@@ -328,16 +453,28 @@ export function findBlockMatch(
 ): { keyword: string; categoryLabel: string | null } | null {
   if (!shouldBlock(query, settings)) return null
   if (settings.globalBlock) return { keyword: '', categoryLabel: null }
-  const lower = query.toLowerCase()
   for (const k of settings.keywords) {
-    if (lower.includes(k.toLowerCase())) return { keyword: k, categoryLabel: null }
+    if (matchKeyword(query, k)) return { keyword: k, categoryLabel: null }
   }
   for (const catId of settings.enabledCategories) {
     const cat = settings.customCategories.find((c) => c.id === catId)
     if (!cat) continue
     for (const k of cat.keywords) {
-      if (lower.includes(k.toLowerCase())) return { keyword: k, categoryLabel: cat.label }
+      if (matchKeyword(query, k)) return { keyword: k, categoryLabel: cat.label }
     }
   }
   return null
+}
+
+/**
+ * 回傳「讓這個查詢被放行」的例外關鍵字，沒有則回傳 null（供 UI 說明為何沒擋）。
+ *
+ * 只有在「拿掉例外清單就會被擋」時才算數 —— 否則使用者自己加的無關例外
+ * （例如 `台北`）會在每個根本不會被擋的頁面上冒出「已放行」的假訊息。
+ */
+export function findAllowMatch(query: string, settings: BlocklistSettings): string | null {
+  if (settings.paused || settings.globalBlock) return null
+  const hit = settings.allowKeywords.find((k) => matchKeyword(query, k))
+  if (!hit) return null
+  return shouldBlock(query, { ...settings, allowKeywords: [] }) ? hit : null
 }

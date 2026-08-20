@@ -15,10 +15,12 @@ import {
   MAX_LABEL_LEN,
   detectDefaultLocale,
   detectDefaultTheme,
+  isValidKeyword,
   loadSettings,
   normalizeCategories,
   normalizeCategoryOrder,
   saveSettings,
+  seedDefaultAllowKeywords,
   seedDefaultCategories,
   type BlocklistSettings,
   type Category,
@@ -88,6 +90,7 @@ export function useBlockList() {
     ...DEFAULT_SETTINGS,
     blockTypes: { ...DEFAULT_SETTINGS.blockTypes },
     keywords: [...DEFAULT_SETTINGS.keywords],
+    allowKeywords: [...DEFAULT_SETTINGS.allowKeywords],
     enabledCategories: [...DEFAULT_SETTINGS.enabledCategories],
     categoryOrder: [],
     customCategories: [],
@@ -122,6 +125,19 @@ export function useBlockList() {
 
   function removeKeyword(keyword: string) {
     settings.value.keywords = settings.value.keywords.filter((k) => k !== keyword)
+  }
+
+  function addAllowKeyword(keyword: string): AddKeywordResult {
+    const trimmed = keyword.trim()
+    if (!trimmed) return 'empty'
+    if (trimmed.length > MAX_KEYWORD_LEN) return 'too_long'
+    if (settings.value.allowKeywords.includes(trimmed)) return 'duplicate'
+    settings.value.allowKeywords.push(trimmed)
+    return 'added'
+  }
+
+  function removeAllowKeyword(keyword: string) {
+    settings.value.allowKeywords = settings.value.allowKeywords.filter((k) => k !== keyword)
   }
 
   function addCategory(label: string): string {
@@ -204,6 +220,8 @@ export function useBlockList() {
     saveError,
     addKeyword,
     removeKeyword,
+    addAllowKeyword,
+    removeAllowKeyword,
     addCategory,
     addCategoryFromPreset,
     addCategoryFromDefault,
@@ -251,11 +269,21 @@ export function parseImport(jsonStr: string): BlocklistSettings | null {
           : {}),
       },
       keywords: Array.isArray(raw.keywords)
-        ? (raw.keywords as unknown[]).filter((k): k is string => typeof k === 'string' && k.length <= MAX_KEYWORD_LEN)
+        ? (raw.keywords as unknown[]).filter(isValidKeyword)
         : [...DEFAULT_SETTINGS.keywords],
+      // 與 loadSettings 同一套遷移規則：舊版備份檔沒有這個欄位 → 帶入內建例外
+      allowKeywords: Array.isArray(raw.allowKeywords)
+        ? (raw.allowKeywords as unknown[]).filter(isValidKeyword)
+        : seedDefaultAllowKeywords(locale),
       enabledCategories,
       categoryOrder: normalizeCategoryOrder(raw.categoryOrder, categoryIds),
       customCategories: categories,
+      perResultBlock:
+        typeof raw.perResultBlock === 'boolean'
+          ? raw.perResultBlock
+          : DEFAULT_SETTINGS.perResultBlock,
+      pageIndicator:
+        typeof raw.pageIndicator === 'boolean' ? raw.pageIndicator : DEFAULT_SETTINGS.pageIndicator,
       locale,
       theme: raw.theme === 'light' || raw.theme === 'dark' ? raw.theme : detectDefaultTheme(),
     }
@@ -266,10 +294,10 @@ export function parseImport(jsonStr: string): BlocklistSettings | null {
 
 /**
  * 把 imported 設定合併到 current 上：
- * - 自訂關鍵字 / 啟用分類：取聯集（去重）
+ * - 自訂關鍵字 / 例外關鍵字 / 啟用分類：取聯集（去重）
  * - customCategories：以 id 為 key 合併；同 id 者保留現有 label，keywords 取聯集
  * - categoryOrder：保留現有順序，新增 id 補在尾端
- * - paused / globalBlock / blockTypes / locale / theme：保留現有，imported 不覆蓋
+ * - paused / globalBlock / blockTypes / perResultBlock / pageIndicator / locale / theme：保留現有
  *
  * 設計理念：使用者匯入別人分享的關鍵字組合時，「個人偏好（語系、主題、UI 開關）」
  * 應該維持不變，只把對方的「黑名單內容」融入。
@@ -279,6 +307,9 @@ export function mergeSettings(
   imported: BlocklistSettings,
 ): BlocklistSettings {
   const keywords = Array.from(new Set([...current.keywords, ...imported.keywords]))
+  const allowKeywords = Array.from(
+    new Set([...current.allowKeywords, ...imported.allowKeywords]),
+  )
 
   const byId = new Map<string, Category>()
   for (const c of current.customCategories) {
@@ -310,9 +341,12 @@ export function mergeSettings(
     globalBlock: current.globalBlock,
     blockTypes: { ...current.blockTypes },
     keywords,
+    allowKeywords,
     customCategories,
     categoryOrder,
     enabledCategories,
+    perResultBlock: current.perResultBlock,
+    pageIndicator: current.pageIndicator,
     locale: current.locale,
     theme: current.theme,
   }

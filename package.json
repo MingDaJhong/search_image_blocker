@@ -12,6 +12,8 @@
     "zip": "wxt zip",
     "zip:firefox": "wxt zip -b firefox",
     "compile": "vue-tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "postinstall": "wxt prepare"
   },
   "dependencies": {
@@ -21,11 +23,14 @@
   "devDependencies": {
     "@types/chrome": "^0.0.287",
     "@vitejs/plugin-vue": "^5.2.4",
+    "@webext-core/fake-browser": "^2.0.1",
     "@wxt-dev/module-vue": "^1.0.3",
     "autoprefixer": "^10.5.0",
+    "happy-dom": "^20.11.6",
     "postcss": "^8.5.13",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.9.3",
+    "vitest": "^4.1.11",
     "vue-tsc": "^2.2.12",
     "wxt": "^0.19.29"
   },

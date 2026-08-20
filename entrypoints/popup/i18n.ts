@@ -6,6 +6,10 @@ export const messages = {
     loading: "載入中…",
     globalBlock: "全域阻擋",
     globalBlockDesc: "不論搜尋什麼都隱藏",
+    perResultBlock: "逐筆結果比對",
+    perResultBlockDesc: "搜尋字沒命中時，改看每一筆結果的文字與圖片說明，只擋命中那筆的圖",
+    pageIndicator: "頁面提示",
+    pageIndicatorDesc: "在搜尋頁角落顯示隱藏了幾個區塊，可一鍵本頁顯示",
     blockTypesTitle: "要隱藏的區塊",
     blockImages: "圖片輪播 / 橫幅",
     blockThumbnails: "搜尋結果縮圖",
@@ -19,6 +23,11 @@ export const messages = {
     collapse: "收合",
     customKeywordsTitle: "自訂關鍵字",
     keywordPlaceholder: "輸入關鍵字後 Enter",
+    allowKeywordsTitle: "例外關鍵字",
+    allowKeywordsHint:
+      "命中這些字的搜尋一律不擋，優先於自訂關鍵字與觸發分類。用來排除「蛇年」「蟬聯」這類含有關鍵字、但內容其實無關的查詢。（全域阻擋開啟時不適用）",
+    allowKeywordPlaceholder: "輸入例外關鍵字後 Enter",
+    noAllowKeywords: "尚未設定例外關鍵字",
     addBtn: "新增",
     noKeywords: "尚未設定關鍵字",
     removeAria: (kw: string) => `移除 ${kw}`,
@@ -64,12 +73,17 @@ export const messages = {
         : cat
           ? `目前阻擋中：關鍵字「${kw}」（${cat}）`
           : `目前阻擋中：自訂關鍵字「${kw}」`,
+    allowedByMsg: (kw: string) => `此頁未阻擋：命中例外關鍵字「${kw}」`,
   },
   en: {
     subtitle: "Hide visual clutter from Google Search",
     loading: "Loading…",
     globalBlock: "Block all",
     globalBlockDesc: "Hide regardless of what you search",
+    perResultBlock: "Scan individual results",
+    perResultBlockDesc: "When the query itself doesn't match, check each result's text and image descriptions, hiding only that result's images",
+    pageIndicator: "On-page indicator",
+    pageIndicatorDesc: "Show what was hidden, with a one-click reveal for this page",
     blockTypesTitle: "What to hide",
     blockImages: "Image carousel / banner",
     blockThumbnails: "Search result thumbnails",
@@ -83,6 +97,11 @@ export const messages = {
     collapse: "Collapse",
     customKeywordsTitle: "Custom keywords",
     keywordPlaceholder: "Type a keyword and press Enter",
+    allowKeywordsTitle: "Exceptions",
+    allowKeywordsHint:
+      "Searches matching these are never blocked — this beats your keywords and trigger categories. Use it for queries like \"flea market\" or \"spider chart\" that contain a keyword but not the content. (Ignored while Block all is on.)",
+    allowKeywordPlaceholder: "Type an exception and press Enter",
+    noAllowKeywords: "No exceptions yet",
     addBtn: "Add",
     noKeywords: "No custom keywords yet",
     removeAria: (kw: string) => `Remove ${kw}`,
@@ -129,6 +148,7 @@ export const messages = {
         : cat
           ? `Blocking active: keyword "${kw}" (${cat})`
           : `Blocking active: custom keyword "${kw}"`,
+    allowedByMsg: (kw: string) => `Not blocked: matched exception "${kw}"`,
   },
 } as const;
 

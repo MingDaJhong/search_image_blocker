@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref } from "vue";
 import type { Category, AddKeywordResult } from "@/composables/useBlockList";
-import { MAX_KEYWORD_LEN, MAX_LABEL_LEN } from "@/composables/useBlockList";
+import { MAX_LABEL_LEN } from "@/composables/useBlockList";
 import type { Messages } from "./i18n";
+import KeywordSection from "./KeywordSection.vue";
 
 const props = defineProps<{
   category: Category;
@@ -19,9 +20,11 @@ const emit = defineEmits<{
 
 const editingLabel = ref(false);
 const labelDraft = ref("");
-const newKeyword = ref("");
-const keywordError = ref<AddKeywordResult | null>(null);
-let errorTimer = 0;
+
+// 綁定到目前分類的 add / remove，交給 KeywordSection 使用
+const addKeyword = (kw: string): AddKeywordResult =>
+  props.addCatKeyword(props.category.id, kw);
+const removeKeyword = (kw: string) => props.removeCatKeyword(props.category.id, kw);
 
 function startEditLabel() {
   labelDraft.value = props.category.label;
@@ -33,20 +36,6 @@ function commitLabel() {
 }
 function cancelEditLabel() {
   editingLabel.value = false;
-}
-
-function handleAddKeyword() {
-  const result = props.addCatKeyword(props.category.id, newKeyword.value);
-  if (result === "added") {
-    newKeyword.value = "";
-    keywordError.value = null;
-  } else {
-    clearTimeout(errorTimer);
-    keywordError.value = result;
-    errorTimer = window.setTimeout(() => {
-      keywordError.value = null;
-    }, 2500);
-  }
 }
 
 function handleDelete() {
@@ -111,65 +100,14 @@ function handleDelete() {
     </button>
   </section>
 
-  <section>
-    <h2
-      class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2"
-    >
-      {{ t.keywordsLabel }}
-    </h2>
-
-    <form
-      :class="['flex gap-2', keywordError ? 'mb-0' : 'mb-2']"
-      @submit.prevent="handleAddKeyword"
-    >
-      <input
-        v-model="newKeyword"
-        type="text"
-        :placeholder="t.addKeywordPlaceholder"
-        :maxlength="MAX_KEYWORD_LEN"
-        :class="[
-          'flex-1 px-3 py-1.5 text-sm border rounded-md focus:outline-none focus:ring-2 focus:border-transparent dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500',
-          keywordError
-            ? 'border-red-400 dark:border-red-600 focus:ring-red-400'
-            : 'border-gray-300 dark:border-gray-700 focus:ring-primary-500',
-        ]"
-        @input="keywordError = null"
-      />
-      <button
-        type="submit"
-        class="px-3 py-1.5 text-sm bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors"
-      >
-        {{ t.addBtn }}
-      </button>
-    </form>
-    <p
-      v-if="keywordError"
-      class="mt-1 mb-2 text-xs text-red-500 dark:text-red-400"
-    >
-      {{ keywordError === "duplicate" ? t.errorDuplicate : keywordError === "too_long" ? t.errorTooLong : t.errorEmpty }}
-    </p>
-
-    <div
-      v-if="category.keywords.length === 0"
-      class="text-xs text-gray-400 dark:text-gray-500 text-center py-3"
-    >
-      {{ t.emptyCategoryKeywords }}
-    </div>
-    <ul v-else class="flex flex-wrap gap-1.5">
-      <li
-        v-for="kw in category.keywords"
-        :key="kw"
-        class="inline-flex items-center gap-1 px-2 py-1 bg-primary-50 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 text-xs rounded-md max-w-[10rem] overflow-hidden"
-      >
-        <span class="truncate" :title="kw">{{ kw }}</span>
-        <button
-          class="hover:text-primary-900 dark:hover:text-primary-100 font-bold leading-none"
-          :aria-label="t.removeAria(kw)"
-          @click="props.removeCatKeyword(props.category.id, kw)"
-        >
-          ×
-        </button>
-      </li>
-    </ul>
-  </section>
+  <KeywordSection
+    :title="t.keywordsLabel"
+    :keywords="category.keywords"
+    :placeholder="t.addKeywordPlaceholder"
+    :empty-text="t.emptyCategoryKeywords"
+    :t="t"
+    :add="addKeyword"
+    :remove="removeKeyword"
+    tone="block"
+  />
 </template>
