@@ -11,8 +11,11 @@ import {
   INITIAL_HIDE_BLOCK_TYPES,
   buildBlockCSS,
   buildInitialHideCSS,
+  collectAllSelectors,
+  collectAlwaysHideSelectors,
   collectBlockSelectors,
   countBlockedElements,
+  findRevealTarget,
 } from './selectors'
 
 const ALL_ON: (typeof DEFAULT_SETTINGS)['blockTypes'] = {
@@ -28,7 +31,7 @@ const ALL_ON: (typeof DEFAULT_SETTINGS)['blockTypes'] = {
 describe('selector 語法', () => {
   it('每一個 selector 都是瀏覽器解析得出來的合法 CSS', () => {
     const invalid: string[] = []
-    for (const sel of collectBlockSelectors(ALL_ON)) {
+    for (const sel of collectAllSelectors(ALL_ON)) {
       try {
         document.querySelectorAll(sel)
       } catch {
@@ -39,7 +42,7 @@ describe('selector 語法', () => {
   })
 
   it('沒有重複的 selector', () => {
-    const all = collectBlockSelectors(ALL_ON)
+    const all = collectAllSelectors(ALL_ON)
     expect(all.length).toBe(new Set(all).size)
   })
 })
@@ -50,7 +53,7 @@ describe('CSS 產出', () => {
     // 併成一條的話，一個 typo 就會讓所有阻擋全滅。
     const css = buildBlockCSS({ ...DEFAULT_SETTINGS, blockTypes: ALL_ON })
     const rules = css.split('\n').filter(Boolean)
-    expect(rules.length).toBe(collectBlockSelectors(ALL_ON).length)
+    expect(rules.length).toBe(collectAllSelectors(ALL_ON).length)
     for (const rule of rules) {
       expect(rule).toMatch(/\{ display: none !important; \}$/)
     }
@@ -159,6 +162,113 @@ describe('countBlockedElements', () => {
       Object.keys(ALL_ON).map((k) => [k, false]),
     ) as typeof ALL_ON
     expect(countBlockedElements(root, noneOn)).toBe(0)
+    root.remove()
+  })
+})
+
+describe('遮蔽方式（B2）', () => {
+  const withMode = (hideMode: (typeof DEFAULT_SETTINGS)['hideMode']) => ({
+    ...DEFAULT_SETTINGS,
+    hideMode,
+    blockTypes: ALL_ON,
+  })
+
+  it('blur 保留版面 —— 不能出現 display: none', () => {
+    const css = buildBlockCSS(withMode('blur'))
+    expect(css).toContain('filter: blur(')
+    // <video> 那組例外還是 display:none，所以只檢查「可遮的那批」不含它
+    for (const sel of collectBlockSelectors(ALL_ON)) {
+      const rule = css.split('\n').find((r) => r.startsWith(`${sel} {`))
+      expect(rule).not.toContain('display: none')
+    }
+  })
+
+  it('mask 先鋪一層不透明底色再壓平，避免透明 PNG 留下剪影', () => {
+    const css = buildBlockCSS(withMode('mask'))
+    // contrast(0) 只動顏色不動 alpha：沒有底色的話，透明背景的 PNG 會留下
+    // 一個灰色剪影 —— 而剪影正是恐懼症使用者最不能看的東西
+    expect(css).toContain('box-shadow: inset 0 0 0 9999px #000 !important;')
+    expect(css).toContain('filter: contrast(0) brightness(1.6) !important;')
+  })
+
+  it.each(['blur', 'mask'] as const)('%s 會附上「已點開」的抵銷規則', (mode) => {
+    const css = buildBlockCSS(withMode(mode))
+    const revealRules = css
+      .split('\n')
+      .filter((r) => r.includes('[data-sib-reveal]'))
+    // 每一個可遮的 selector 都要有自己的抵銷規則：
+    // 只寫一條 `[data-sib-reveal]` specificity 會輸給 `#search img`，點了沒反應
+    expect(revealRules).toHaveLength(collectBlockSelectors(ALL_ON).length)
+    for (const rule of revealRules) {
+      expect(rule).toContain('filter: none !important;')
+      expect(rule).toContain('box-shadow: none !important;')
+      expect(rule).toContain('clip-path: none !important;')
+    }
+  })
+
+  it('hide 模式不產生抵銷規則 —— display:none 的元素點不到', () => {
+    expect(buildBlockCSS(withMode('hide'))).not.toContain('[data-sib-reveal]')
+  })
+
+  it.each(['hide', 'blur', 'mask'] as const)(
+    '%s 模式下 <video> 一律 display:none（否則 hover 會播、還會出聲）',
+    (mode) => {
+      const css = buildBlockCSS(withMode(mode))
+      const videoSelectors = collectAlwaysHideSelectors(ALL_ON)
+      expect(videoSelectors.length).toBeGreaterThan(0)
+      for (const sel of videoSelectors) {
+        expect(css).toContain(`${sel} { display: none !important; }`)
+      }
+    },
+  )
+
+  it('videos 關掉時就沒有「一律隱藏」的 selector', () => {
+    expect(collectAlwaysHideSelectors({ ...ALL_ON, videos: false })).toEqual([])
+  })
+
+  it('開場遮蔽仍然不看 hideMode —— 它跑在 storage 回應之前', () => {
+    // visibility: hidden 是三種模式的共同上界，遮得比任何一種都多
+    expect(buildInitialHideCSS()).toContain('visibility: hidden !important;')
+    expect(buildInitialHideCSS()).not.toContain('filter')
+  })
+})
+
+describe('findRevealTarget', () => {
+  function serp(html: string) {
+    const root = document.createElement('div')
+    root.id = 'search'
+    root.innerHTML = html
+    document.body.append(root)
+    return root
+  }
+
+  it('點在圖上時挑最深的命中 —— 點開的範圍愈小愈好', () => {
+    const root = serp('<g-scrolling-carousel><span><img id="t"></span></g-scrolling-carousel>')
+    const img = document.getElementById('t')!
+    // 這張圖同時符合 `#search img` 與祖先的 `g-scrolling-carousel`，
+    // 挑輪播的話點一張圖會把整條輪播放開
+    expect(findRevealTarget(img, DEFAULT_SETTINGS.blockTypes)?.id).toBe('t')
+    root.remove()
+  })
+
+  it('已經點開過的元素回傳 null，讓那一下正常傳下去（可以真的點進結果）', () => {
+    const root = serp('<img id="t" data-sib-reveal="1">')
+    const img = document.getElementById('t')!
+    expect(findRevealTarget(img, DEFAULT_SETTINGS.blockTypes)).toBeNull()
+    root.remove()
+  })
+
+  it('點在沒被遮的東西上回傳 null', () => {
+    const root = serp('<h3 id="title">家中常見的蜘蛛</h3>')
+    const title = document.getElementById('title')!
+    expect(findRevealTarget(title, DEFAULT_SETTINGS.blockTypes)).toBeNull()
+    root.remove()
+  })
+
+  it('不會把「一律隱藏」的 <video> 當成可點開的目標', () => {
+    const root = serp('<video-voyager><video id="v"></video></video-voyager>')
+    const video = document.getElementById('v')!
+    expect(findRevealTarget(video, DEFAULT_SETTINGS.blockTypes)).toBeNull()
     root.remove()
   })
 })

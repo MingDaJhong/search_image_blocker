@@ -12,11 +12,29 @@ import { browser } from 'wxt/browser'
 export type Locale = 'zh-TW' | 'en'
 export type Theme = 'light' | 'dark'
 
+/**
+ * 命中之後要怎麼遮。
+ *
+ * 「整塊消失」不一定是最好的預設：很多使用者要的是「我知道那裡有東西、
+ * 由我決定要不要看」，而不是「東西被拿走了」。
+ *
+ * - `hide` 最徹底（版面跟著收起來，圖片也不會下載），是舊版唯一的行為
+ * - `blur` 保留版面、看不出形狀，但圖片仍會下載
+ * - `mask` 蓋成純色方塊，連輪廓都不露；揭露是明確的主動點擊
+ *   （對恐懼症族群，hover 揭露反而危險）
+ *
+ * 預設維持 `hide` —— 既有使用者的儲存裡沒有這個欄位，換預設值等於在
+ * 一次更新裡靜默改掉他們看到的畫面。要換模式是使用者的決定，不是我們的。
+ */
+export type HideMode = 'hide' | 'blur' | 'mask'
+
 export interface BlocklistSettings {
   /** 暫停所有封鎖（不改任何設定，只是暫時停用） */
   paused: boolean
   /** 啟用全域阻擋（不論關鍵字都隱藏） */
   globalBlock: boolean
+  /** 命中之後怎麼遮：直接隱藏 / 模糊 / 純色遮罩 */
+  hideMode: HideMode
   /** 要隱藏哪些區塊類型 */
   blockTypes: {
     images: boolean
@@ -145,6 +163,7 @@ export const DEFAULT_CATEGORIES: DefaultCategory[] = [
 export const DEFAULT_SETTINGS: BlocklistSettings = {
   paused: false,
   globalBlock: false,
+  hideMode: 'hide',
   blockTypes: {
     images: true,
     thumbnails: true,
@@ -163,6 +182,14 @@ export const DEFAULT_SETTINGS: BlocklistSettings = {
   pageIndicator: true,
   locale: 'zh-TW',
   theme: 'light',
+}
+
+/**
+ * 舊版記錄沒有這個欄位，一律回到 `hide`（也就是它們原本的行為）。
+ * 遷移規則刻意不「幫使用者選一個更安全的模式」—— 那會在更新後靜默改變畫面。
+ */
+export function normalizeHideMode(raw: unknown): HideMode {
+  return raw === 'hide' || raw === 'blur' || raw === 'mask' ? raw : DEFAULT_SETTINGS.hideMode
 }
 
 export function detectDefaultTheme(): Theme {
@@ -325,6 +352,7 @@ export async function loadSettings(): Promise<BlocklistSettings> {
     return {
       paused: typeof raw.paused === 'boolean' ? raw.paused : false,
       globalBlock: typeof raw.globalBlock === 'boolean' ? raw.globalBlock : DEFAULT_SETTINGS.globalBlock,
+      hideMode: normalizeHideMode(raw.hideMode),
       blockTypes: {
         ...DEFAULT_SETTINGS.blockTypes,
         ...(raw.blockTypes && typeof raw.blockTypes === 'object'

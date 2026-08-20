@@ -2,7 +2,7 @@
   "name": "search-image-blocker",
   "description": "Block image/video blocks on Google search results by keyword",
   "private": true,
-  "version": "1.0.2",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "wxt",
@@ -14,6 +14,7 @@
     "compile": "vue-tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "sync:privacy": "cp entrypoints/privacy/index.html privacy.html",
     "postinstall": "wxt prepare"
   },
   "dependencies": {

@@ -280,3 +280,82 @@ describe('掃描範圍 fallback', () => {
     scanner.disconnect()
   })
 })
+
+describe('遮蔽方式（B2）與單張揭露', () => {
+  const img = (id: string) => document.getElementById(id) as HTMLImageElement
+
+  /** a / b 兩筆命中，c 完全無關 */
+  function serp() {
+    const el = document.createElement('div')
+    el.id = 'search'
+    el.innerHTML = `
+      <article><h3>家中常見的蜘蛛種類</h3><div><img id="a"></div></article>
+      <article><h3>蟑螂怎麼處理</h3><div><img id="b"></div></article>
+      <article><h3>台北一週天氣預報</h3><div><img id="c"></div></article>
+    `
+    document.body.append(el)
+    return el
+  }
+
+  it('跟著 hideMode 走 —— 逐筆判斷是判斷邏輯，不該自己決定長什麼樣', () => {
+    serp()
+    const scanner = scanResults(() => ({ ...settings, hideMode: 'mask' }), () => {})
+    expect(img('a').style.display).toBe('')
+    expect(img('a').style.filter).toContain('contrast(0)')
+    expect(img('a').style.boxShadow).toContain('inset')
+    scanner.disconnect()
+  })
+
+  it('隱藏的圖帶掃描標記，點擊委派不必知道任何 selector', () => {
+    serp()
+    const scanner = scanResults(() => ({ ...settings, hideMode: 'blur' }), () => {})
+    expect(img('a').getAttribute('data-sib-scan')).toBe('1')
+    expect(img('c').hasAttribute('data-sib-scan')).toBe(false)
+    scanner.disconnect()
+  })
+
+  it('reveal() 只放開那一張，其他照樣遮著', () => {
+    serp()
+    const scanner = scanResults(() => ({ ...settings, hideMode: 'mask' }), () => {})
+    expect(scanner.hiddenCount).toBe(2)
+    expect(scanner.reveal(img('a'))).toBe(true)
+    expect(img('a').getAttribute('style') ?? '').toBe('')
+    expect(img('b').style.filter).toContain('contrast(0)')
+    expect(scanner.hiddenCount).toBe(1)
+    scanner.disconnect()
+  })
+
+  it('揭露過的圖不會在下一次掃描被蓋回去', () => {
+    serp()
+    const scanner = scanResults(() => ({ ...settings, hideMode: 'mask' }), () => {})
+    scanner.reveal(img('a'))
+    scanner.rescan()
+    expect(img('a').getAttribute('style') ?? '').toBe('')
+    scanner.disconnect()
+  })
+
+  it('reveal() 對不是自己遮的元素回傳 false', () => {
+    serp()
+    const scanner = scanResults(() => settings, () => {})
+    expect(scanner.reveal(img('c'))).toBe(false)
+    scanner.disconnect()
+  })
+
+  it('reveal() 會通知呼叫端 —— 頁面提示的數字要跟著降', () => {
+    serp()
+    const onChange = vi.fn()
+    const scanner = scanResults(() => ({ ...settings, hideMode: 'blur' }), onChange)
+    onChange.mockClear()
+    scanner.reveal(img('a'))
+    expect(onChange).toHaveBeenCalledOnce()
+    scanner.disconnect()
+  })
+
+  it('disconnect() 在 mask 模式下也還原得乾淨', () => {
+    serp()
+    const scanner = scanResults(() => ({ ...settings, hideMode: 'mask' }), () => {})
+    scanner.disconnect()
+    expect(img('a').getAttribute('style') ?? '').toBe('')
+    expect(img('a').hasAttribute('data-sib-scan')).toBe(false)
+  })
+})

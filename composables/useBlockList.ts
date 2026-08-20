@@ -19,6 +19,7 @@ import {
   loadSettings,
   normalizeCategories,
   normalizeCategoryOrder,
+  normalizeHideMode,
   saveSettings,
   seedDefaultAllowKeywords,
   seedDefaultCategories,
@@ -31,6 +32,56 @@ import {
 export * from './blockList'
 
 export type AddKeywordResult = 'added' | 'duplicate' | 'empty' | 'too_long'
+
+/** 批次貼上的結果統計，供 UI 一句話回報 */
+export interface AddManyResult {
+  added: number
+  duplicate: number
+  /** 空白或超過長度上限而被丟掉的 */
+  skipped: number
+}
+
+/**
+ * 把一段貼上的文字切成關鍵字清單。
+ *
+ * 分隔符同時吃換行、半形／全形逗號、頓號與分號 —— 使用者的來源可能是
+ * 一行一個的清單，也可能是從別處複製的 `蜘蛛、蟑螂、蜈蚣`。要求他們先
+ * 手動整理成單一格式，等於這個功能只解掉一半的麻煩。
+ *
+ * 只做切割與去重，長度／重複的判斷仍然交給 addKeyword —— 驗證規則有一份
+ * 就好，不要在這裡長出第二套。
+ */
+export function parseBulkKeywords(text: string): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of text.split(/[\n\r,，、;；]+/)) {
+    const keyword = raw.trim()
+    if (!keyword || seen.has(keyword)) continue
+    seen.add(keyword)
+    out.push(keyword)
+  }
+  return out
+}
+
+/**
+ * 把一批關鍵字灌進任何一個 `add` mutator，回傳統計。
+ *
+ * 拿 `add` 當參數而不是綁死某一份清單：自訂關鍵字、例外關鍵字、分類關鍵字
+ * 三個呼叫點共用同一套邏輯（跟 KeywordSection.vue 的設計理由一樣）。
+ */
+export function addManyKeywords(
+  text: string,
+  add: (keyword: string) => AddKeywordResult,
+): AddManyResult {
+  const result: AddManyResult = { added: 0, duplicate: 0, skipped: 0 }
+  for (const keyword of parseBulkKeywords(text)) {
+    const outcome = add(keyword)
+    if (outcome === 'added') result.added++
+    else if (outcome === 'duplicate') result.duplicate++
+    else result.skipped++
+  }
+  return result
+}
 
 /**
  * 預設範本：使用者可主動透過「+ 範本」按鈕加入，不會自動 seed。
@@ -262,6 +313,7 @@ export function parseImport(jsonStr: string): BlocklistSettings | null {
     return {
       paused: typeof raw.paused === 'boolean' ? raw.paused : false,
       globalBlock: typeof raw.globalBlock === 'boolean' ? raw.globalBlock : DEFAULT_SETTINGS.globalBlock,
+      hideMode: normalizeHideMode(raw.hideMode),
       blockTypes: {
         ...DEFAULT_SETTINGS.blockTypes,
         ...(raw.blockTypes && typeof raw.blockTypes === 'object'
@@ -297,7 +349,7 @@ export function parseImport(jsonStr: string): BlocklistSettings | null {
  * - 自訂關鍵字 / 例外關鍵字 / 啟用分類：取聯集（去重）
  * - customCategories：以 id 為 key 合併；同 id 者保留現有 label，keywords 取聯集
  * - categoryOrder：保留現有順序，新增 id 補在尾端
- * - paused / globalBlock / blockTypes / perResultBlock / pageIndicator / locale / theme：保留現有
+ * - paused / globalBlock / hideMode / blockTypes / perResultBlock / pageIndicator / locale / theme：保留現有
  *
  * 設計理念：使用者匯入別人分享的關鍵字組合時，「個人偏好（語系、主題、UI 開關）」
  * 應該維持不變，只把對方的「黑名單內容」融入。
@@ -339,6 +391,7 @@ export function mergeSettings(
   return {
     paused: current.paused,
     globalBlock: current.globalBlock,
+    hideMode: current.hideMode,
     blockTypes: { ...current.blockTypes },
     keywords,
     allowKeywords,

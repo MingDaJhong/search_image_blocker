@@ -23,7 +23,13 @@ import {
   type BlocklistSettings,
   type Locale,
 } from './blockList'
-import { PRESET_TEMPLATES, mergeSettings, parseImport } from './useBlockList'
+import {
+  PRESET_TEMPLATES,
+  addManyKeywords,
+  mergeSettings,
+  parseBulkKeywords,
+  parseImport,
+} from './useBlockList'
 
 /** 內建 3 個分類 + 2 個範本全開，作為「最容易誤判」的最壞情況 */
 function allCategoriesOn(locale: Locale, allowKeywords: string[] = []): BlocklistSettings {
@@ -467,4 +473,71 @@ describe('isValidKeyword', () => {
       expect(isValidKeyword(k)).toBe(false)
     },
   )
+})
+
+describe('遮蔽方式（B2）的遷移', () => {
+  beforeEach(() => {
+    fakeBrowser.reset()
+  })
+
+  it('舊版記錄沒有這個欄位 → hide，也就是它們原本的行為', async () => {
+    // 換預設值等於在一次更新裡靜默改掉既有使用者看到的畫面
+    await fakeBrowser.storage.sync.set({ [STORAGE_KEY]: { keywords: ['蛇'] } })
+    expect((await loadSettings()).hideMode).toBe('hide')
+  })
+
+  it.each(['hide', 'blur', 'mask'] as const)('尊重已存的 %s', async (mode) => {
+    await fakeBrowser.storage.sync.set({ [STORAGE_KEY]: { hideMode: mode } })
+    expect((await loadSettings()).hideMode).toBe(mode)
+  })
+
+  it('storage 裡是垃圾值時退回 hide，不會讓畫面停在未定義狀態', async () => {
+    await fakeBrowser.storage.sync.set({ [STORAGE_KEY]: { hideMode: 'sparkle' } })
+    expect((await loadSettings()).hideMode).toBe('hide')
+  })
+
+  it('匯入檔的 hideMode 也走同一套正規化', () => {
+    expect(parseImport(JSON.stringify({ hideMode: 'mask' }))?.hideMode).toBe('mask')
+    expect(parseImport(JSON.stringify({ hideMode: 42 }))?.hideMode).toBe('hide')
+  })
+
+  it('合併匯入保留自己的遮蔽方式 —— 那是個人偏好，不是對方的黑名單內容', () => {
+    const merged = mergeSettings(
+      { ...DEFAULT_SETTINGS, hideMode: 'mask' },
+      { ...DEFAULT_SETTINGS, hideMode: 'hide' },
+    )
+    expect(merged.hideMode).toBe('mask')
+  })
+})
+
+describe('批次貼上（B6）', () => {
+  it('吃換行、逗號、頓號、分號 —— 使用者的來源格式不會只有一種', () => {
+    expect(parseBulkKeywords('蜘蛛\n蟑螂,蜈蚣、蠍子；蜜蜂')).toEqual([
+      '蜘蛛',
+      '蟑螂',
+      '蜈蚣',
+      '蠍子',
+      '蜜蜂',
+    ])
+  })
+
+  it('去空白、丟掉空行、同一批內去重', () => {
+    expect(parseBulkKeywords('  蜘蛛  \n\n蜘蛛\n , ,\n蟑螂')).toEqual(['蜘蛛', '蟑螂'])
+  })
+
+  it('整段都是空白時回傳空陣列', () => {
+    expect(parseBulkKeywords('  \n , 、\n')).toEqual([])
+  })
+
+  it('驗證仍然交給 add —— 這裡不長第二套規則', () => {
+    // 長度與重複的判斷只有 addKeyword 那一份，這裡只負責切割與統計
+    const existing = new Set(['蜘蛛'])
+    const result = addManyKeywords('蜘蛛\n蟑螂\n' + 'x'.repeat(51), (kw) => {
+      if (kw.length > 50) return 'too_long'
+      if (existing.has(kw)) return 'duplicate'
+      existing.add(kw)
+      return 'added'
+    })
+    expect(result).toEqual({ added: 1, duplicate: 1, skipped: 1 })
+  })
 })

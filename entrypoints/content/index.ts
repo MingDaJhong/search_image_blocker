@@ -8,12 +8,21 @@ import {
   type BlocklistSettings,
 } from "@/composables/blockList";
 import {
+  DIAGNOSE_MESSAGE,
+  TOGGLE_REVEAL_MESSAGE,
+  type DiagnosisReport,
+} from "@/composables/diagnostics";
+import {
   buildBlockCSS,
   buildInitialHideCSS,
   countBlockedElements,
+  findRevealTarget,
 } from "./selectors";
+import { REVEAL_ATTR, SCAN_ATTR, isRevealable } from "./hideStyle";
+import { revealOnClick, type ClickRevealer } from "./clickReveal";
 import { createIndicator, type Indicator } from "./indicator";
 import { scanResults, type ResultScanner } from "./resultScanner";
+import { readSearchQuery, watchSearchQuery } from "./softNav";
 
 const BLOCK_STYLE_ID = "sib-block-style";
 const INITIAL_STYLE_ID = "sib-initial-hide";
@@ -40,8 +49,9 @@ export default defineContentScript({
   ],
   runAt: "document_start",
   async main() {
-    const url = new URL(location.href);
-    const query = url.searchParams.get("q") ?? "";
+    // 軟導航（切 udm 分頁 / 按篩選 chip）會換掉 `q` 而不重新執行 content script，
+    // 所以這是變數不是常數 —— 見 softNav.ts
+    let query = readSearchQuery(location.href);
 
     // 先注入隱藏 CSS（避免閃爍）
     injectInitialHideStyle();
@@ -50,6 +60,19 @@ export default defineContentScript({
     let autocompleteWatcher: AutocompleteWatcher | null = null;
     let indicator: Indicator | null = null;
     let resultScanner: ResultScanner | null = null;
+    /** resultScanner 是用哪一種遮蔽方式建的；使用者換模式時要重建才吃得到 */
+    let scannerMode = settings.hideMode;
+    let clickRevealer: ClickRevealer | null = null;
+    /**
+     * 頁面層級封鎖 CSS 目前是不是掛著的。
+     *
+     * 點擊揭露必須看這個旗標，不能只看 selector 有沒有命中：selector 在
+     * 「這一頁根本沒被擋」的時候照樣會命中 `#search img`，那會讓 mask 模式下
+     * 每一次點縮圖都被吞掉一次 —— 使用者看到的是「這個擴充功能讓 Google 點不動」。
+     */
+    let pageBlocked = false;
+    /** 被點開過的頁面層級元素，換設定時要把標記收回去 */
+    const pageRevealed = new Set<HTMLElement>();
     /**
      * 使用者在本頁按了「顯示」。刻意只活在這次頁面載入的記憶體裡 ——
      * 不改設定、不寫任何儲存，所以沒有隱私成本，重新整理就恢復隱藏。
@@ -74,7 +97,41 @@ export default defineContentScript({
       resultScanner = null;
     }
 
+    function stopClickRevealer() {
+      clickRevealer?.disconnect();
+      clickRevealer = null;
+      for (const el of pageRevealed) el.removeAttribute(REVEAL_ATTR);
+      pageRevealed.clear();
+    }
+
+    /**
+     * 點在遮罩上時，先問頁面層級的 selector，再問逐筆掃描留下的標記。
+     * 順序無所謂（兩者不會同時生效：query 命中就不跑掃描），但頁面層級便宜一些。
+     */
+    function findMaskedElement(target: Element): HTMLElement | null {
+      const fromPage = pageBlocked
+        ? findRevealTarget(target, settings.blockTypes)
+        : null;
+      if (fromPage) return fromPage;
+      const fromScan = target.closest(`[${SCAN_ATTR}]`);
+      return fromScan instanceof HTMLElement ? fromScan : null;
+    }
+
+    function revealElement(el: HTMLElement) {
+      // 逐筆掃描是用 inline style 遮的，得由 scanner 自己清；
+      // 頁面 CSS 遮的則是靠這個標記讓抵銷規則生效
+      if (resultScanner?.reveal(el)) return;
+      el.setAttribute(REVEAL_ATTR, "1");
+      pageRevealed.add(el);
+    }
+
     function toggleReveal() {
+      // 什麼都沒被遮的時候（例如在無關的搜尋頁按了快捷鍵）不該切換 ——
+      // 否則提示會冒出「已顯示本頁圖片」，報告一件沒有發生的事。
+      // 頁面提示上那顆按鈕不受影響：提示只在真的有擋到東西時才存在。
+      if (!revealed && !shouldBlock(query, settings) && !resultScanner?.hiddenCount) {
+        return;
+      }
       revealed = !revealed;
       applyState(settings);
     }
@@ -115,26 +172,46 @@ export default defineContentScript({
 
       // paused 時完整早退：不留任何 CSS、observer 或提示
       if (s.paused) {
+        pageBlocked = false;
         document.getElementById(BLOCK_STYLE_ID)?.remove();
         stopAutocompleteWatcher();
         stopResultScanner();
+        stopClickRevealer();
         removeIndicator();
         return;
       }
 
       const queryBlocked = shouldBlock(query, s);
-      syncPageBlock(queryBlocked && !revealed, s);
+      pageBlocked = queryBlocked && !revealed;
+      syncPageBlock(pageBlocked, s);
+
+      // 換遮蔽方式時要重建：已經被遮住的圖在 scanner 的 `seen` 裡，
+      // 單純 rescan() 不會回頭把它們換成新模式的樣子
+      if (resultScanner && scannerMode !== s.hideMode) stopResultScanner();
 
       // 逐筆掃描只在「query 沒命中」時跑：命中的話整頁已經遮了，
       // 再掃一次既浪費 CPU 又會把同一批圖重複計數
       if (s.perResultBlock && !queryBlocked && !revealed && document.body) {
-        resultScanner ??= scanResults(
-          () => settings,
-          () => refreshIndicator(settings),
-        );
+        if (!resultScanner) {
+          scannerMode = s.hideMode;
+          resultScanner = scanResults(
+            () => settings,
+            () => refreshIndicator(settings),
+          );
+        }
         resultScanner.rescan();
       } else {
         stopResultScanner();
+      }
+
+      // 「點一下顯示這一個」只有 blur / mask 有意義 —— display:none 的元素點不到
+      if (isRevealable(s.hideMode) && !revealed) {
+        clickRevealer ??= revealOnClick({
+          find: findMaskedElement,
+          reveal: revealElement,
+        });
+      } else {
+        stopClickRevealer();
       }
 
       // 「本頁顯示」也要放開搜尋建議的縮圖 —— 那也是這一頁的一部分
@@ -166,12 +243,51 @@ export default defineContentScript({
       }
     });
 
+    // A6：軟導航後 q 會換掉，但 content script 不會重新執行
+    watchSearchQuery((next) => {
+      query = next;
+      // 換了一頁就該回到「有擋」的狀態：上一頁按過的顯示不該跟著過來
+      revealed = false;
+      stopResultScanner();
+      stopClickRevealer();
+      applyState(settings);
+      // 新結果是非同步串流進來的，跟首次載入一樣要補數
+      setTimeout(() => refreshIndicator(settings), 1000);
+    });
+
     browser.storage.onChanged.addListener((changes, area) => {
       if (area !== "sync" || !(STORAGE_KEY in changes)) return;
       loadSettings().then((newSettings) => {
         settings = newSettings;
         applyState(newSettings);
       });
+    });
+
+    /**
+     * 來自 background（鍵盤快捷鍵）與 popup（診斷）的訊息。
+     *
+     * 診斷刻意走訊息而不是 `chrome.scripting.executeScript`：後者需要
+     * `scripting` 權限，而對已上架的擴充功能新增權限會讓 Chrome 停用它、
+     * 等使用者重新同意 —— 一批現有使用者會直接流失在那個對話框上。
+     */
+    browser.runtime.onMessage.addListener((message: unknown) => {
+      const type = (message as { type?: unknown } | null)?.type;
+      if (type === TOGGLE_REVEAL_MESSAGE) {
+        toggleReveal();
+        return Promise.resolve({ revealed });
+      }
+      if (type === DIAGNOSE_MESSAGE) {
+        const report: DiagnosisReport = {
+          query,
+          paused: settings.paused,
+          queryBlocked: !settings.paused && shouldBlock(query, settings),
+          cssMatches: countBlockedElements(document, settings.blockTypes),
+          scannerMatches: resultScanner?.hiddenCount ?? 0,
+          revealed,
+        };
+        return Promise.resolve(report);
+      }
+      return undefined;
     });
   },
 });

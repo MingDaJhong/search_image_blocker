@@ -1,4 +1,4 @@
-import type { Locale } from "@/composables/useBlockList";
+import type { AddManyResult, Locale } from "@/composables/useBlockList";
 
 export const messages = {
   "zh-TW": {
@@ -74,6 +74,36 @@ export const messages = {
           ? `目前阻擋中：關鍵字「${kw}」（${cat}）`
           : `目前阻擋中：自訂關鍵字「${kw}」`,
     allowedByMsg: (kw: string) => `此頁未阻擋：命中例外關鍵字「${kw}」`,
+    hideModeTitle: "遮蔽方式",
+    hideModeHint:
+      "模糊與遮罩會保留版面，並且可以在搜尋頁點一下被遮住的圖，只顯示那一張；代價是圖片仍然會下載。影片一律直接隱藏，避免 hover 自動播放。",
+    hideModeHide: "直接隱藏",
+    hideModeHideDesc: "整塊移除，版面跟著收起來；圖片不會下載",
+    hideModeBlur: "模糊",
+    hideModeBlurDesc: "保留版面、看不出形狀，點一下可單獨顯示",
+    hideModeMask: "純色遮罩",
+    hideModeMaskDesc: "蓋成灰色方塊，連輪廓都不露，點一下可單獨顯示",
+    openOptions: "開啟完整設定",
+    diagnoseBtn: "檢查是否失效",
+    diagOk: (n: number) => `運作正常：這一頁有 ${n} 個區塊被隱藏`,
+    diagBroken: "一個可隱藏的區塊都找不到 —— Google 可能改版了，請回報",
+    diagIdle: "這一頁沒有需要隱藏的內容，搜尋字沒有命中任何關鍵字",
+    diagPaused: "封鎖目前是暫停狀態",
+    diagUnreachable: "請先切到 Google 搜尋分頁再檢查（安裝之前就開著的分頁需要重新整理）",
+    diagReportLink: "回報問題",
+    shortcutsTitle: "鍵盤快捷鍵",
+    shortcutOpenPopup: "開啟設定面板",
+    shortcutToggleReveal: "本頁顯示 / 復原",
+    shortcutsCustomize: "自訂快捷鍵",
+    keywordFilterPlaceholder: "篩選關鍵字",
+    keywordFilterEmpty: "沒有符合的關鍵字",
+    bulkAddBtn: "批次貼上",
+    bulkPlaceholder: "一行一個，或用逗號 / 頓號分隔",
+    bulkApplyBtn: "全部加入",
+    bulkResult: (r: AddManyResult) =>
+      `已新增 ${r.added} 個` +
+      (r.duplicate ? ` · 重複 ${r.duplicate}` : "") +
+      (r.skipped ? ` · 略過 ${r.skipped}` : ""),
   },
   en: {
     subtitle: "Hide visual clutter from Google Search",
@@ -149,6 +179,38 @@ export const messages = {
           ? `Blocking active: keyword "${kw}" (${cat})`
           : `Blocking active: custom keyword "${kw}"`,
     allowedByMsg: (kw: string) => `Not blocked: matched exception "${kw}"`,
+    hideModeTitle: "How to hide",
+    hideModeHint:
+      "Blur and mask keep the layout and let you click a covered image to reveal just that one — but the images still download. Videos are always removed outright so hover previews can never play.",
+    hideModeHide: "Remove",
+    hideModeHideDesc: "Taken out of the layout entirely; images never download",
+    hideModeBlur: "Blur",
+    hideModeBlurDesc: "Layout kept, shape unrecognizable; click to reveal one",
+    hideModeMask: "Solid mask",
+    hideModeMaskDesc: "Flat grey tile, not even an outline; click to reveal one",
+    openOptions: "Open full settings",
+    diagnoseBtn: "Check if blocking still works",
+    diagOk: (n: number) => `Working: ${n} blocks are hidden on this page`,
+    diagBroken:
+      "Found nothing to hide — Google may have changed its layout. Please report it",
+    diagIdle: "Nothing to hide here; the query matched no keyword",
+    diagPaused: "Blocking is currently paused",
+    diagUnreachable:
+      "Switch to a Google search tab first (tabs opened before installing need a reload)",
+    diagReportLink: "Report an issue",
+    shortcutsTitle: "Keyboard shortcuts",
+    shortcutOpenPopup: "Open the settings panel",
+    shortcutToggleReveal: "Show / hide on this page",
+    shortcutsCustomize: "Customize shortcuts",
+    keywordFilterPlaceholder: "Filter keywords",
+    keywordFilterEmpty: "No matching keywords",
+    bulkAddBtn: "Bulk paste",
+    bulkPlaceholder: "One per line, or comma-separated",
+    bulkApplyBtn: "Add all",
+    bulkResult: (r: AddManyResult) =>
+      `${r.added} added` +
+      (r.duplicate ? ` · ${r.duplicate} duplicate` : "") +
+      (r.skipped ? ` · ${r.skipped} skipped` : ""),
   },
 } as const;
 

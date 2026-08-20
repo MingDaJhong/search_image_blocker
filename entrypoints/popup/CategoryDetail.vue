@@ -5,14 +5,19 @@ import { MAX_LABEL_LEN } from "@/composables/useBlockList";
 import type { Messages } from "./i18n";
 import KeywordSection from "./KeywordSection.vue";
 
-const props = defineProps<{
-  category: Category;
-  t: Messages;
-  setCatLabel: (id: string, label: string) => void;
-  addCatKeyword: (id: string, keyword: string) => AddKeywordResult;
-  removeCatKeyword: (id: string, keyword: string) => void;
-  removeCategory: (id: string) => void;
-}>();
+const props = withDefaults(
+  defineProps<{
+    category: Category;
+    t: Messages;
+    setCatLabel: (id: string, label: string) => void;
+    addCatKeyword: (id: string, keyword: string) => AddKeywordResult;
+    removeCatKeyword: (id: string, keyword: string) => void;
+    removeCategory: (id: string) => void;
+    /** 寬版面（獨立設定頁）才打開關鍵字篩選與批次貼上 */
+    wide?: boolean;
+  }>(),
+  { wide: false },
+);
 
 const emit = defineEmits<{
   deleted: [];
@@ -109,5 +114,7 @@ function handleDelete() {
     :add="addKeyword"
     :remove="removeKeyword"
     tone="block"
+    :searchable="props.wide"
+    :bulk="props.wide"
   />
 </template>

@@ -8,9 +8,17 @@
  *
  * `tone` 決定 chip 顏色，這是有意義的區分而非裝飾：
  * 藍色 = 命中會擋，綠色 = 命中會放行。
+ *
+ * `searchable` / `bulk` 預設關閉，只有寬版面（獨立設定頁）會打開 —— 360 px 的
+ * popup 再多兩個輸入框就塞不下了，而這兩個功能本來也是「幾百個關鍵字」才需要。
  */
-import { ref } from 'vue'
-import { MAX_KEYWORD_LEN, type AddKeywordResult } from '@/composables/useBlockList'
+import { computed, ref } from 'vue'
+import {
+  MAX_KEYWORD_LEN,
+  addManyKeywords,
+  type AddKeywordResult,
+  type AddManyResult,
+} from '@/composables/useBlockList'
 import type { Messages } from './i18n'
 
 const props = withDefaults(
@@ -25,9 +33,22 @@ const props = withDefaults(
     remove: (keyword: string) => void
     tone?: 'block' | 'allow'
     hint?: string
+    /** 顯示篩選框（清單長到一定程度才會出現） */
+    searchable?: boolean
+    /** 顯示批次貼上 */
+    bulk?: boolean
   }>(),
-  { tone: 'block', title: undefined, hint: undefined },
+  {
+    tone: 'block',
+    title: undefined,
+    hint: undefined,
+    searchable: false,
+    bulk: false,
+  },
 )
+
+/** 低於這個數量，用眼睛掃比用篩選框快 —— 早早就冒出一個輸入框只是雜訊 */
+const FILTER_THRESHOLD = 12
 
 const draft = ref('')
 const error = ref<AddKeywordResult | null>(null)
@@ -47,6 +68,34 @@ function handleAdd() {
   }, 2500)
 }
 
+const filter = ref('')
+const showFilter = computed(
+  () => props.searchable && props.keywords.length >= FILTER_THRESHOLD,
+)
+const visibleKeywords = computed(() => {
+  const needle = filter.value.trim().toLowerCase()
+  if (!showFilter.value || !needle) return props.keywords
+  return props.keywords.filter((k) => k.toLowerCase().includes(needle))
+})
+
+const showBulk = ref(false)
+const bulkDraft = ref('')
+const bulkSummary = ref<AddManyResult | null>(null)
+let bulkTimer = 0
+
+function handleBulk() {
+  const summary = addManyKeywords(bulkDraft.value, props.add)
+  bulkSummary.value = summary
+  if (summary.added > 0) {
+    bulkDraft.value = ''
+    showBulk.value = false
+  }
+  clearTimeout(bulkTimer)
+  bulkTimer = window.setTimeout(() => {
+    bulkSummary.value = null
+  }, 4000)
+}
+
 const CHIP_CLASS = {
   block:
     'bg-primary-50 dark:bg-primary-900/40 text-primary-700 dark:text-primary-300 hover:text-primary-900 dark:hover:text-primary-100',
@@ -57,14 +106,59 @@ const CHIP_CLASS = {
 
 <template>
   <section>
-    <h2
-      v-if="title"
-      class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2"
-    >
-      {{ title }}
-    </h2>
+    <div v-if="title || bulk" class="flex items-center justify-between mb-2">
+      <h2
+        v-if="title"
+        class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide"
+      >
+        {{ title }}
+      </h2>
+      <span v-else />
+      <button
+        v-if="bulk"
+        type="button"
+        class="text-xs text-primary-600 dark:text-primary-400 hover:underline"
+        @click="showBulk = !showBulk"
+      >
+        {{ t.bulkAddBtn }}
+      </button>
+    </div>
     <p v-if="hint" class="text-xs text-gray-500 dark:text-gray-400 mb-2 leading-relaxed">
       {{ hint }}
+    </p>
+
+    <form v-if="showBulk" class="mb-2" @submit.prevent="handleBulk">
+      <textarea
+        v-model="bulkDraft"
+        rows="4"
+        :placeholder="t.bulkPlaceholder"
+        class="w-full px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+      />
+      <div class="mt-1.5 flex gap-2 justify-end">
+        <button
+          type="button"
+          class="px-2 py-1 text-xs rounded hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-500 dark:text-gray-400"
+          @click="
+            showBulk = false;
+            bulkDraft = '';
+          "
+        >
+          {{ t.cancelBtn }}
+        </button>
+        <button
+          type="submit"
+          class="px-3 py-1 text-xs bg-primary-600 hover:bg-primary-700 text-white rounded-md transition-colors"
+        >
+          {{ t.bulkApplyBtn }}
+        </button>
+      </div>
+    </form>
+    <p
+      v-if="bulkSummary"
+      class="mb-2 text-xs text-gray-500 dark:text-gray-400"
+      role="status"
+    >
+      {{ t.bulkResult(bulkSummary) }}
     </p>
 
     <form :class="['flex gap-2', error ? 'mb-0' : 'mb-2']" @submit.prevent="handleAdd">
@@ -98,15 +192,30 @@ const CHIP_CLASS = {
       }}
     </p>
 
+    <input
+      v-if="showFilter"
+      v-model="filter"
+      type="search"
+      :placeholder="t.keywordFilterPlaceholder"
+      :aria-label="t.keywordFilterPlaceholder"
+      class="w-full mb-2 px-3 py-1 text-xs border border-gray-200 dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder-gray-500 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+    />
+
     <div
       v-if="keywords.length === 0"
       class="text-xs text-gray-400 dark:text-gray-500 text-center py-3"
     >
       {{ emptyText }}
     </div>
+    <div
+      v-else-if="visibleKeywords.length === 0"
+      class="text-xs text-gray-400 dark:text-gray-500 text-center py-3"
+    >
+      {{ t.keywordFilterEmpty }}
+    </div>
     <ul v-else class="flex flex-wrap gap-1.5">
       <li
-        v-for="kw in keywords"
+        v-for="kw in visibleKeywords"
         :key="kw"
         :class="[
           'inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md max-w-[10rem] overflow-hidden',

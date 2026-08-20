@@ -16,11 +16,28 @@ import {
   type Locale,
   type Category,
   type BlocklistSettings,
+  type HideMode,
 } from "@/composables/useBlockList";
-import { isGoogleSearchUrl } from "@/composables/googleTlds";
+import { GOOGLE_SEARCH_MATCHES, isGoogleSearchUrl } from "@/composables/googleTlds";
+import {
+  DIAGNOSE_MESSAGE,
+  summarizeDiagnosis,
+  type DiagnosisReport,
+  type DiagnosisVerdict,
+} from "@/composables/diagnostics";
 import { messages, type Messages } from "./i18n";
 import CategoryDetail from "./CategoryDetail.vue";
 import KeywordSection from "./KeywordSection.vue";
+
+/**
+ * 同一個元件同時當 popup（360 px）與獨立設定頁（`entrypoints/options/`）用。
+ *
+ * `wide` 不只是換個寬度：它決定「哪些東西值得攤開」—— 例外關鍵字的 57 個 chip
+ * 在 popup 裡必須收進子頁，在設定頁裡直接展開反而比較好用；關鍵字篩選與批次
+ * 貼上也只有在有空間的時候才有意義。複製一份 OptionsApp.vue 出來會讓兩邊
+ * 立刻開始漂移，這裡的每一個 section 都是同一份實作。
+ */
+const props = withDefaults(defineProps<{ wide?: boolean }>(), { wide: false });
 
 const {
   settings,
@@ -56,9 +73,41 @@ const allowMatch = computed(() => {
   return findAllowMatch(query, settings.value);
 });
 
+/**
+ * 找出要拿來判讀的 Google 搜尋分頁。
+ *
+ * 先看目前的 active tab；獨立設定頁自己就是一個分頁，那時 active tab 永遠
+ * 不是搜尋頁，所以退而找所有搜尋分頁裡最近使用的那一個。少了這一段，設定頁
+ * 上的「目前阻擋中」與「檢查是否失效」會永遠是空的。
+ *
+ * `tabs.query` 的 url 過濾靠的是既有的 host permissions，沒有新增權限。
+ */
+async function findSearchTab() {
+  const active = await browser.tabs.query({ active: true, currentWindow: true });
+  const current = active[0];
+  if (current?.url && isSearchUrl(current.url)) return current;
+  const matches = await browser.tabs.query({ url: [...GOOGLE_SEARCH_MATCHES] });
+  return (
+    [...matches].sort(
+      (a, b) =>
+        ((b as { lastAccessed?: number }).lastAccessed ?? 0) -
+        ((a as { lastAccessed?: number }).lastAccessed ?? 0),
+    )[0] ?? null
+  );
+}
+
+function isSearchUrl(href: string): boolean {
+  try {
+    return isGoogleSearchUrl(new URL(href));
+  } catch {
+    return false;
+  }
+}
+
 watch(loaded, async (isLoaded) => {
   if (!isLoaded) return;
   refreshStorageUsage();
+  loadShortcuts();
   // 截圖模式：popup 以分頁開啟並帶 ?q=<關鍵字> 時，跳過 tabs API
   // 直接把該關鍵字當成「目前搜尋字串」，方便擷取阻擋 banner 畫面。
   const overrideQ = new URL(location.href).searchParams.get("q");
@@ -67,13 +116,9 @@ watch(loaded, async (isLoaded) => {
     return;
   }
   try {
-    const tabs = await browser.tabs.query({
-      active: true,
-      currentWindow: true,
-    });
-    const url = tabs[0]?.url ? new URL(tabs[0].url) : null;
-    if (!url || !isGoogleSearchUrl(url)) return;
-    currentSearchQuery.value = url.searchParams.get("q") ?? "";
+    const tab = await findSearchTab();
+    if (!tab?.url) return;
+    currentSearchQuery.value = new URL(tab.url).searchParams.get("q") ?? "";
   } catch {
     // tabs API 不可用或 URL 無法存取
   }
@@ -189,6 +234,106 @@ const orderedCategories = computed<Category[]>({
 });
 
 const t = computed<Messages>(() => messages[settings.value.locale]);
+
+const hideModeOptions = computed<
+  Array<{ value: HideMode; label: string; desc: string }>
+>(() => [
+  { value: "hide", label: t.value.hideModeHide, desc: t.value.hideModeHideDesc },
+  { value: "blur", label: t.value.hideModeBlur, desc: t.value.hideModeBlurDesc },
+  { value: "mask", label: t.value.hideModeMask, desc: t.value.hideModeMaskDesc },
+]);
+
+const REPORT_URL = "https://github.com/mingdajhong/search_image_blocker/issues";
+
+/**
+ * B8：使用者可觸發的失效診斷。
+ *
+ * 這個產品沒有任何遙測（那是它的隱私主張），所以 Google 改 DOM 時我們無從得知。
+ * 頁面提示上的「已隱藏 0 個區塊」是第一道訊號，但那要剛好在被擋的頁面上才看得到。
+ * 這顆按鈕讓使用者能主動問一次，並拿到一句可以直接回報的結論。
+ *
+ * 走 `tabs.sendMessage` 而不是 `scripting.executeScript`：後者要新增 `scripting`
+ * 權限，而對已上架的擴充功能新增權限會讓 Chrome 停用它直到使用者重新同意。
+ */
+const diagVerdict = ref<DiagnosisVerdict | null>(null);
+const diagCount = ref(0);
+let diagTimer = 0;
+
+async function handleDiagnose() {
+  showHeaderMenu.value = false;
+  let report: DiagnosisReport | null = null;
+  try {
+    const tab = await findSearchTab();
+    if (tab?.id !== undefined) {
+      report = (await browser.tabs.sendMessage(tab.id, {
+        type: DIAGNOSE_MESSAGE,
+      })) as DiagnosisReport;
+    }
+  } catch {
+    // 這個分頁沒有 content script（安裝前就開著、或不是搜尋頁）
+    report = null;
+  }
+  diagCount.value = report
+    ? report.queryBlocked
+      ? report.cssMatches
+      : report.scannerMatches
+    : 0;
+  diagVerdict.value = summarizeDiagnosis(report);
+  clearTimeout(diagTimer);
+  diagTimer = window.setTimeout(() => {
+    diagVerdict.value = null;
+  }, 8000);
+}
+
+const diagMessage = computed(() => {
+  switch (diagVerdict.value) {
+    case "ok":
+      return t.value.diagOk(diagCount.value);
+    case "broken":
+      return t.value.diagBroken;
+    case "idle":
+      return t.value.diagIdle;
+    case "paused":
+      return t.value.diagPaused;
+    case "unreachable":
+      return t.value.diagUnreachable;
+    default:
+      return "";
+  }
+});
+
+/**
+ * 快捷鍵清單。刻意讀 `commands.getAll()` 而不是把 manifest 的建議組合寫死 ——
+ * 使用者在 chrome://extensions/shortcuts 改過之後，寫死的那份就是錯的。
+ */
+const shortcuts = ref<Array<{ label: string; shortcut: string }>>([]);
+
+async function loadShortcuts() {
+  try {
+    const all = await browser.commands.getAll();
+    shortcuts.value = all
+      .filter((c) => c.shortcut)
+      .map((c) => ({
+        label:
+          c.name === "toggle-reveal"
+            ? t.value.shortcutToggleReveal
+            : t.value.shortcutOpenPopup,
+        shortcut: c.shortcut ?? "",
+      }));
+  } catch {
+    // Firefox 或不支援 commands 的環境
+  }
+}
+
+function openShortcutSettings() {
+  // chrome:// 連結沒辦法用 <a> 開，只能由擴充功能自己建分頁
+  browser.tabs.create({ url: "chrome://extensions/shortcuts" }).catch(() => {});
+}
+
+function openOptions() {
+  showHeaderMenu.value = false;
+  browser.runtime.openOptionsPage();
+}
 
 /** 子頁 header 的標題（主畫面時不會用到） */
 const detailTitle = computed(() =>
@@ -331,7 +476,12 @@ function cancelImport() {
 </script>
 
 <template>
-  <div class="bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 p-4">
+  <div
+    :class="[
+      'bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100',
+      props.wide ? 'mx-auto max-w-5xl p-6' : 'p-4',
+    ]"
+  >
     <input
       ref="importFileInput"
       type="file"
@@ -470,6 +620,40 @@ function cancelImport() {
             </button>
             <div class="border-t border-gray-100 dark:border-gray-700 my-1" />
             <button
+              v-if="!props.wide"
+              type="button"
+              class="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+              @click="openOptions"
+            >
+              <svg
+                viewBox="0 0 20 20"
+                class="w-4 h-4 fill-current shrink-0"
+                aria-hidden="true"
+              >
+                <path
+                  d="M11 3a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1v5a1 1 0 1 1-2 0V5.414l-5.293 5.293a1 1 0 0 1-1.414-1.414L14.586 4H12a1 1 0 0 1-1-1ZM4 5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h9a2 2 0 0 0 2-2v-3a1 1 0 1 0-2 0v3H4V7h3a1 1 0 1 0 0-2H4Z"
+                />
+              </svg>
+              {{ t.openOptions }}
+            </button>
+            <button
+              type="button"
+              class="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+              @click="handleDiagnose"
+            >
+              <svg
+                viewBox="0 0 20 20"
+                class="w-4 h-4 fill-current shrink-0"
+                aria-hidden="true"
+              >
+                <path
+                  d="M9 2a7 7 0 1 0 4.192 12.606l3.101 3.101a1 1 0 0 0 1.414-1.414l-3.1-3.101A7 7 0 0 0 9 2ZM4 9a5 5 0 1 1 10 0A5 5 0 0 1 4 9Z"
+                />
+              </svg>
+              {{ t.diagnoseBtn }}
+            </button>
+            <div class="border-t border-gray-100 dark:border-gray-700 my-1" />
+            <button
               type="button"
               class="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
               @click="handleExport"
@@ -566,6 +750,30 @@ function cancelImport() {
         {{ t.importError }}
       </div>
 
+      <!-- 診斷結果 -->
+      <div
+        v-if="diagVerdict"
+        :class="[
+          'mb-4 px-3 py-2 border rounded-md text-xs flex items-start gap-2',
+          diagVerdict === 'broken'
+            ? 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-600 dark:text-red-400'
+            : diagVerdict === 'ok'
+              ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-300'
+              : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400',
+        ]"
+        role="status"
+      >
+        <span class="flex-1">{{ diagMessage }}</span>
+        <a
+          v-if="diagVerdict === 'broken'"
+          :href="REPORT_URL"
+          target="_blank"
+          rel="noopener"
+          class="shrink-0 underline underline-offset-2"
+          >{{ t.diagReportLink }}</a
+        >
+      </div>
+
       <!-- 目前阻擋來源提示 -->
       <div
         v-if="blockMatch"
@@ -580,6 +788,11 @@ function cancelImport() {
         {{ t.allowedByMsg(allowMatch) }}
       </div>
 
+      <!--
+        寬版面把區塊排成兩欄。每個 section 是 grid 的直接子元素，所以不需要
+        另外包欄容器 —— 少一層 DOM，也不會出現「popup 與設定頁結構不同」的分叉。
+      -->
+      <div :class="props.wide ? 'grid lg:grid-cols-2 gap-x-8 items-start' : ''">
       <!-- 全域開關 -->
       <section
         class="mb-6 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
@@ -629,6 +842,41 @@ function cancelImport() {
             class="w-4 h-4 accent-primary-600"
           />
         </label>
+      </section>
+
+      <!-- 遮蔽方式 -->
+      <section class="mb-6">
+        <h2
+          class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2"
+        >
+          {{ t.hideModeTitle }}
+        </h2>
+        <p
+          class="text-xs text-gray-500 dark:text-gray-400 mb-2 leading-relaxed"
+        >
+          {{ t.hideModeHint }}
+        </p>
+        <div class="space-y-1.5">
+          <label
+            v-for="opt in hideModeOptions"
+            :key="opt.value"
+            class="flex items-start gap-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1.5 rounded"
+          >
+            <input
+              v-model="settings.hideMode"
+              :value="opt.value"
+              type="radio"
+              name="sib-hide-mode"
+              class="mt-1 accent-primary-600"
+            />
+            <span class="min-w-0">
+              <span class="block">{{ opt.label }}</span>
+              <span class="block text-xs text-gray-500 dark:text-gray-400">{{
+                opt.desc
+              }}</span>
+            </span>
+          </label>
+        </div>
       </section>
 
       <!-- 區塊類型 -->
@@ -900,8 +1148,26 @@ function cancelImport() {
         </draggable>
       </section>
 
-      <!-- 例外關鍵字：主畫面只留入口，清單在子頁（57 條 chip 會把 popup 撐爆） -->
-      <section class="mb-6">
+      <!--
+        例外關鍵字：寬版面直接攤開（有空間，攤開比多點一層好用）；
+        popup 只留入口，57 條 chip 會把 360 px 的畫面撐爆。
+      -->
+      <KeywordSection
+        v-if="props.wide"
+        :title="t.allowKeywordsTitle"
+        :keywords="settings.allowKeywords"
+        :placeholder="t.allowKeywordPlaceholder"
+        :empty-text="t.noAllowKeywords"
+        :hint="t.allowKeywordsHint"
+        :t="t"
+        :add="addAllowKeyword"
+        :remove="removeAllowKeyword"
+        tone="allow"
+        searchable
+        bulk
+        class="mb-6"
+      />
+      <section v-else class="mb-6">
         <h2
           class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2"
         >
@@ -943,7 +1209,45 @@ function cancelImport() {
         :add="addKeyword"
         :remove="removeKeyword"
         tone="block"
+        :searchable="props.wide"
+        :bulk="props.wide"
+        class="mb-6"
       />
+
+      <!--
+        快捷鍵只在設定頁列出來。使用者不會自己去 chrome://extensions/shortcuts
+        翻，所以功能存在等於不存在；而 popup 已經沒有空間再多一個區塊。
+        鍵位是從 commands.getAll() 讀的，改過的組合也會顯示正確的那一個。
+      -->
+      <section v-if="props.wide && shortcuts.length" class="mb-6">
+        <h2
+          class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2"
+        >
+          {{ t.shortcutsTitle }}
+        </h2>
+        <dl class="space-y-1.5">
+          <div
+            v-for="sc in shortcuts"
+            :key="sc.label"
+            class="flex items-baseline justify-between gap-2 text-sm p-1.5"
+          >
+            <dt class="min-w-0 truncate">{{ sc.label }}</dt>
+            <dd
+              class="shrink-0 px-1.5 py-0.5 text-xs font-mono rounded border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-800 text-gray-600 dark:text-gray-300"
+            >
+              {{ sc.shortcut }}
+            </dd>
+          </div>
+        </dl>
+        <button
+          type="button"
+          class="mt-2 text-xs text-primary-600 dark:text-primary-400 hover:underline"
+          @click="openShortcutSettings"
+        >
+          {{ t.shortcutsCustomize }}
+        </button>
+      </section>
+      </div>
 
       <footer
         class="mt-6 pt-3 border-t border-gray-200 dark:border-gray-800 text-xs text-gray-400 dark:text-gray-500"
@@ -998,6 +1302,7 @@ function cancelImport() {
       v-else-if="detailCategory"
       :category="detailCategory"
       :t="t"
+      :wide="props.wide"
       :set-cat-label="setCatLabel"
       :add-cat-keyword="addCatKeyword"
       :remove-cat-keyword="removeCatKeyword"
@@ -1016,6 +1321,7 @@ function cancelImport() {
       :add="addAllowKeyword"
       :remove="removeAllowKeyword"
       tone="allow"
+      searchable
     />
   </div>
 </template>

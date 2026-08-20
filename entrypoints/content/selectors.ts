@@ -9,6 +9,12 @@
  * 每一組 selector 的註解裡都有它針對的 DOM 結構；失效時對照著改。
  */
 import type { BlocklistSettings } from "@/composables/blockList";
+import {
+  REVEAL_ATTR,
+  hideDeclaration,
+  isRevealable,
+  revealDeclaration,
+} from "./hideStyle";
 
 /**
  * 不算「內容圖片」的東西：favicon 容器（cite、.VuuXrf、.byrV5b、.TbwUpd、
@@ -47,6 +53,39 @@ export const INITIAL_HIDE_BLOCK_TYPES: BlocklistSettings["blockTypes"] = {
 };
 
 /**
+ * 影片卡容器辨識：
+ *   [jscontroller="rTuANe"]  — 知識面板影片 + 主搜尋結果區影片區「都」用這個 controller
+ *   [data-attrid*="Video"]   — 知識面板的 VisualDigestVideoResult / 舊版 VideoObject
+ *   video-voyager / [data-vido] — 舊版 layout 的 fallback
+ */
+const VIDEO_CARD_CONTAINERS = [
+  '[jscontroller="rTuANe"]',
+  'div[data-attrid*="Video"]',
+  "video-voyager",
+  "div[data-vido]",
+  'div[jsname="tX7jT"]',
+];
+
+/**
+ * 不管使用者選了哪種遮蔽方式，這些一律 `display: none`。
+ *
+ * 目前只有 `<video>`：`display: none` 之後瀏覽器根本不會去載入它，hover 預覽
+ * 自然失效。改成模糊或遮罩就等於讓影片留在版面上 —— 它會載入、hover 會播、
+ * **而且會出聲**。對一個為了避開特定畫面存在的產品，那是比看到縮圖更糟的結果。
+ *
+ * 這一組不提供「點一下顯示」：使用者要看影片就把遮蔽關掉或用整頁顯示。
+ */
+export function collectAlwaysHideSelectors(
+  blockTypes: BlocklistSettings["blockTypes"],
+): string[] {
+  if (!blockTypes.videos) return [];
+  return [
+    ...VIDEO_CARD_CONTAINERS.map((card) => `${card} video`),
+    'a[href*="youtube.com/watch"] video',
+  ];
+}
+
+/**
  * 收集啟用的所有頁面層級 selector（不含 autocomplete）。
  *
  * 只吃 blockTypes 而不是整個 settings，這樣開場遮蔽才能傳入一組
@@ -74,32 +113,16 @@ export function collectBlockSelectors(
   }
 
   if (blockTypes.videos) {
-    // 只擋影片卡內部的「預覽圖 + <video> + 背景影像」，不擋整張卡，保留文字標題/來源/日期。
-    // <video> 用 display:none 後瀏覽器不會載入，hover 預覽自動失效。
-    //
-    // 影片卡容器辨識：
-    //   [jscontroller="rTuANe"]  — 知識面板影片 + 主搜尋結果區影片區「都」用這個 controller
-    //   [data-attrid*="Video"]   — 知識面板的 VisualDigestVideoResult / 舊版 VideoObject
-    //   video-voyager / [data-vido] — 舊版 layout 的 fallback
-    const videoCardContainers = [
-      '[jscontroller="rTuANe"]',
-      'div[data-attrid*="Video"]',
-      "video-voyager",
-      "div[data-vido]",
-      'div[jsname="tX7jT"]',
-    ];
-    for (const card of videoCardContainers) {
+    // 只擋影片卡內部的「預覽圖 + 背景影像」，不擋整張卡，保留文字標題/來源/日期。
+    // `<video>` 本身走 collectAlwaysHideSelectors()，理由見那裡。
+    for (const card of VIDEO_CARD_CONTAINERS) {
       selectors.push(
         `${card} img`,
-        `${card} video`,
         `${card} picture`,
         `${card} [style*="background-image"]`,
       );
     }
-    selectors.push(
-      'a[href*="youtube.com/watch"] img',
-      'a[href*="youtube.com/watch"] video',
-    );
+    selectors.push('a[href*="youtube.com/watch"] img');
   }
 
   if (blockTypes.imageFilterBar) {
@@ -151,26 +174,98 @@ function toRules(selectors: string[], declaration: string): string {
   return selectors.map((sel) => `${sel} { ${declaration} }`).join("\n");
 }
 
+/** 頁面層級會被處理到的所有 selector（含一律 display:none 的那組） */
+export function collectAllSelectors(
+  blockTypes: BlocklistSettings["blockTypes"],
+): string[] {
+  return [
+    ...collectBlockSelectors(blockTypes),
+    ...collectAlwaysHideSelectors(blockTypes),
+  ];
+}
+
 /**
- * 根據目前 settings 建出封鎖用 CSS 字串（純函式）
+ * 根據目前 settings 建出封鎖用 CSS 字串（純函式）。
+ *
+ * 三段，順序有意義：
+ *   1. 使用者選的遮蔽方式（hide / blur / mask）
+ *   2. blur / mask 的「這一個已被點開」抵銷規則。specificity 比第 1 段高
+ *      （多一個屬性選擇器），所以能蓋掉同樣帶 !important 的遮蔽宣告
+ *   3. 一律 display:none 的那組放最後，確保它不會被前面任何一條蓋掉
  */
 export function buildBlockCSS(settings: BlocklistSettings): string {
-  return toRules(
-    collectBlockSelectors(settings.blockTypes),
-    "display: none !important;",
+  const { blockTypes, hideMode } = settings;
+  const maskable = collectBlockSelectors(blockTypes);
+  const parts = [toRules(maskable, hideDeclaration(hideMode))];
+
+  if (isRevealable(hideMode)) {
+    parts.push(
+      toRules(
+        maskable.map((sel) => `${sel}[${REVEAL_ATTR}]`),
+        revealDeclaration(),
+      ),
+    );
+  }
+
+  parts.push(
+    toRules(collectAlwaysHideSelectors(blockTypes), hideDeclaration("hide")),
   );
+  return parts.filter(Boolean).join("\n");
 }
 
 /**
  * 開場遮蔽用的 CSS。
  *
  * 用 visibility 而非 display：保留版面，settings 回來移除時不會 reflow。
+ * 也刻意不看 `hideMode` —— 這一段跑在 storage 回應之前，那時還不知道使用者
+ * 選了哪一種，而 `visibility: hidden` 是三種模式的共同上界（遮得比任何一種都多）。
  */
 export function buildInitialHideCSS(): string {
   return toRules(
-    collectBlockSelectors(INITIAL_HIDE_BLOCK_TYPES),
+    collectAllSelectors(INITIAL_HIDE_BLOCK_TYPES),
     "visibility: hidden !important;",
   );
+}
+
+/** 一個元素在文件裡的深度，用來在多個命中之間挑最深（也就是範圍最小）的那個 */
+function depthOf(el: Element): number {
+  let depth = 0;
+  for (let node = el.parentElement; node; node = node.parentElement) depth++;
+  return depth;
+}
+
+/**
+ * 從點擊目標往上找「正被頁面 CSS 遮住、而且可以被點開」的元素。
+ *
+ * 挑最深的命中而不是第一個：selector 之間高度重疊（`#search img` 與
+ * `#rcnt img` 幾乎是同一批），而點開的範圍應該愈小愈好 —— 使用者點的是
+ * 一張圖，不該連整個輪播一起放開。
+ *
+ * 每個 selector 各自 try/catch，理由和「一個 selector 一條 rule」一樣：
+ * 一個壞掉的 selector 只讓自己失效，不會讓整個點擊揭露不能用。
+ */
+export function findRevealTarget(
+  target: Element,
+  blockTypes: BlocklistSettings["blockTypes"],
+): HTMLElement | null {
+  let best: HTMLElement | null = null;
+  let bestDepth = -1;
+  for (const sel of collectBlockSelectors(blockTypes)) {
+    let found: Element | null;
+    try {
+      found = target.closest(sel);
+    } catch {
+      continue;
+    }
+    if (!(found instanceof HTMLElement)) continue;
+    if (found.hasAttribute(REVEAL_ATTR)) continue; // 已經點開過，讓這一下傳下去
+    const depth = depthOf(found);
+    if (depth > bestDepth) {
+      bestDepth = depth;
+      best = found;
+    }
+  }
+  return best;
 }
 
 /**
@@ -187,7 +282,7 @@ export function countBlockedElements(
   blockTypes: BlocklistSettings["blockTypes"],
 ): number {
   const seen = new Set<Element>();
-  for (const sel of collectBlockSelectors(blockTypes)) {
+  for (const sel of collectAllSelectors(blockTypes)) {
     let matched: NodeListOf<Element>;
     try {
       matched = root.querySelectorAll(sel);

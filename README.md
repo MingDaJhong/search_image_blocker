@@ -23,6 +23,9 @@ pnpm zip
 pnpm compile      # 型別檢查
 pnpm test         # 純函式回歸測試
 pnpm test:watch   # 開發時 watch 模式
+
+# 更新隱私權政策後同步根目錄那份（GitHub Pages 服務的來源）
+pnpm sync:privacy
 ```
 
 ## 專案結構
@@ -30,28 +33,35 @@ pnpm test:watch   # 開發時 watch 模式
 ```
 .
 ├── entrypoints/
+│   ├── background.ts      # 只做一件事：把鍵盤快捷鍵轉給 content script
 │   ├── content/           # Content script（注入 16 個 Google TLDs）
-│   │   ├── index.ts       # 生命週期：開場遮蔽 + applyState + autocomplete MutationObserver
+│   │   ├── index.ts       # 生命週期：開場遮蔽 + applyState + autocomplete MutationObserver + 訊息處理
 │   │   ├── selectors.ts   # 所有 Google DOM selector（純函式、零 runtime import）
+│   │   ├── hideStyle.ts   # 遮蔽方式（hide / blur / mask）的單一來源，CSS 與 inline 都由它長出來
+│   │   ├── clickReveal.ts # 點一下顯示這一個（只有 blur / mask 有）
+│   │   ├── softNav.ts     # 軟導航後追蹤 q 的變化（切 udm 分頁 / 篩選 chip）
 │   │   ├── indicator.ts   # 頁面左下角封鎖提示（closed shadow DOM）
 │   │   ├── resultScanner.ts  # 逐筆結果比對（不依賴任何 Google 屬性）
 │   │   ├── messages.ts    # content script 專用文案（不共用 popup 的 i18n，避免打包整包）
-│   │   ├── selectors.test.ts
-│   │   ├── indicator.test.ts
-│   │   └── resultScanner.test.ts
+│   │   └── *.test.ts      # selectors / hideStyle / clickReveal / softNav / indicator / resultScanner
+│   ├── options/           # 獨立設定頁：掛同一個 App.vue，只是 wide=true
+│   │   ├── index.html     # meta manifest.open_in_tab → 開在自己的分頁而不是 iframe
+│   │   └── main.ts
 │   └── popup/             # 點擊圖示彈出的設定頁
-│       ├── App.vue            # 主畫面（Vue 3 + Tailwind）
+│       ├── App.vue            # 主畫面（Vue 3 + Tailwind），popup 與設定頁共用
 │       ├── CategoryDetail.vue # 分類詳情頁（編輯標題、管理關鍵字、刪除）
-│       ├── KeywordSection.vue # 共用的「標題 + 輸入框 + chip 清單」（3 個呼叫點）
+│       ├── KeywordSection.vue # 共用的「標題 + 輸入框 + chip 清單」（3 個呼叫點，可選篩選 / 批次貼上）
 │       ├── i18n.ts            # 多語系 messages
 │       ├── main.ts            # 首次渲染前同步套用 dark class（防閃爍）
-│       ├── style.css
+│       ├── style.css          # 360px 掛在 body.sib-popup 上，設定頁才不會被夾住
 │       └── index.html
 ├── composables/
 │   ├── blockList.ts       # 純資料層（無 Vue）：型別、storage I/O、matchKeyword / shouldBlock — content + popup 都用
 │   ├── blockList.test.ts  # 比對邏輯回歸測試（用真實內建關鍵字清單跑）
+│   ├── diagnostics.ts     # 訊息契約 + summarizeDiagnosis（零 import，四個 surface 共用）
 │   ├── googleTlds.ts      # 支援網域的單一來源（零 import，Node / popup / 測試共用）
 │   ├── googleTlds.test.ts # isGoogleSearchUrl + content script matches 一致性
+│   ├── repoConsistency.test.ts # 版本號 / privacy.html 副本 / i18n 鍵的漂移守門
 │   └── useBlockList.ts    # popup-only：Vue composable + mutators + parseImport / mergeSettings + PRESET_TEMPLATES
 ├── public/icon/           # Extension 圖示 PNG（16/32/48/96/128 px，會被打包進 .crx）
 ├── assets/icons-source/   # SVG 來源 + build.py（不在版控、不打包；本機備份保留）
@@ -92,6 +102,11 @@ pnpm test:watch   # 開發時 watch 模式
 - **逐筆結果比對**：搜尋字沒命中任何關鍵字時，改逐筆判斷每一張圖，只隱藏命中那一張。補的是 query 層級阻擋的盲點 —— 搜「我家牆上這是什麼」時 query 一個關鍵字都不會命中，但結果標題全是「蜘蛛」，那正是最需要保護的時刻。兩個訊號：**圖片自己的 alt / title / aria-label**（含外層連結的），以及**從圖片往上走找到的所屬結果文字**。兩者都**不依賴任何 Google class / jsname**，天生抗 DOM 改版
 - **圖片分頁覆蓋**：alt 比對特別重要 —— 圖片分頁（`udm=2`）的圖磚周圍幾乎沒有文字，但 alt 通常是來源頁標題，而那正是這個產品最關鍵的頁面
 - **頁面提示**：搜尋頁左下角顯示「已隱藏 N 個區塊 · 關鍵字「蛇」」，一鍵「顯示」可在本頁放開圖片（只影響這次載入、不改設定、不寫任何儲存，重新整理即恢復）。若阻擋啟用卻數到 0 個區塊，提示會直接說「沒有找到可隱藏的區塊」—— 在沒有任何遙測的前提下，這是使用者能發現 Google 改版的唯一管道。可於 popup 關閉
+- **遮蔽方式（hide / blur / mask）**：`hide` 整塊移除（版面收起、圖片不下載，1.0.x 的行為，也是預設值）；`blur` 保留版面但看不出形狀；`mask` 蓋成純色方塊，連輪廓都不露。blur 與 mask 可以在搜尋頁**點一下被遮住的圖，只顯示那一張**（刻意是點擊而不是 hover —— 對這個族群「滑過去就露出來」比看不到更糟）。`<video>` 在三種模式下一律直接隱藏，否則它會留在版面上、hover 會播、還會出聲
+- **鍵盤快捷鍵**：`Alt+Shift+B` 開設定面板、`Alt+Shift+S` 切換本頁顯示 / 復原（可在 `chrome://extensions/shortcuts` 改）。設定頁會列出目前實際的鍵位（讀 `commands.getAll()`，不是寫死 manifest 的建議值）
+- **獨立設定頁**：popup 選單「開啟完整設定」。掛的是同一個 `App.vue`，只是把 `wide` 打開 —— 兩欄版面、例外關鍵字直接攤開、關鍵字篩選、批次貼上（換行 / 逗號 / 頓號 / 分號都吃）
+- **失效自我診斷**：popup 選單「檢查是否失效」，對搜尋分頁跑一次 selector 命中統計。關鍵是把「這一頁沒事做」和「壞掉」分開 —— 只有在查詢確實命中黑名單、卻一個元素都沒命中時才說是 Google 改版。在完全沒有遙測的前提下，這是使用者能發現並回報的唯一管道
+- **軟導航追蹤**：切 udm 分頁或按篩選 chip 時 Google 部分走 pushState，網址的 `q` 換了但 content script 不會重新執行。改成持續追蹤 `q`，變了就重跑判斷（content script 在 isolated world，攔不到頁面自己的 pushState，所以是 `popstate` + 500 ms 字串比較）
 - **零閃現開場遮蔽**：`document_start` 就注入「所有可能夾帶圖片的區塊」的 `visibility: hidden`，等設定載入完成再換成正式封鎖 CSS 或整個移除。Google 的 HTML 是串流漸進渲染，設定是非同步讀取，中間那幾毫秒若沒遮住就會閃過圖片 — 對恐懼症產品那就是失效
 - **selector 失效隔離**：封鎖 CSS 是「一個 selector 一條 rule」而非逗號併成一條。CSS 規範規定清單裡任一 selector 無效會讓整條 rule 被丟棄，併在一起等於一個 typo 讓阻擋全滅
 - **多 TLD 支援**：覆蓋 16 個 Google 地區網域（.com / .com.tw / .com.hk / .co.jp / .co.kr / .com.sg / .co.uk / .com.au / .ca / .co.in / .de / .fr / .es / .it / .com.br / .com.mx）
@@ -129,8 +144,12 @@ pnpm test:watch   # 開發時 watch 模式
 - [x] **TLD 清單單一來源**：`composables/googleTlds.ts`（零 import，Node / popup / 測試共用）。content script 的 `matches` 因為 WXT 靜態分析仍是手寫字面量，但改由測試讀原始碼斷言兩者一致
 - [x] **「精確匹配」開關**：改用「依文字系統自動分流 + 例外清單」取代逐關鍵字開關。`matchKeyword()` 對拉丁字母做詞邊界比對（允許 `s` / `es` 複數），CJK 維持 substring；CJK 改不掉的誤判（`蛇` 命中 `蛇年運勢`）由 `settings.allowKeywords` 在上層解決，並內建一份策展清單，使用者不必做任何設定
 - [x] **i18n 拆檔**：`messages` 已抽到 `entrypoints/popup/i18n.ts`，`Messages` 型別由 `(typeof messages)[Locale]` 推出，App.vue 不再內嵌字串表
-- [~] **純函式測試**：vitest 已接上（`WxtVitest()` 提供 `@/` alias 與 `wxt/browser` mock），五個測試檔共 240 個 case，涵蓋 `matchKeyword` / `shouldBlock` / `findBlockMatch` / `findAllowMatch` / `parseImport` / `mergeSettings` / `isValidKeyword`，以及 `loadSettings` 的 `allowKeywords` 遷移路徑（用 `fakeBrowser` 模擬 storage）。誤判清單以 `it.each` 對「真實的內建關鍵字」跑。尚未涵蓋 `normalizeCategoryOrder` / `readLegacyOverrides`
-- [ ] **鍵盤快捷鍵**：用 manifest `commands` 欄位允許快速開啟 popup
+- [x] **獨立設定頁**：`entrypoints/options/` 掛同一個 `App.vue`（`wide=true`），不另開一份元件避免與 popup 漂移。附關鍵字篩選與批次貼上
+- [x] **使用者可觸發的失效診斷**：popup 選單一顆按鈕，走 `tabs.sendMessage` 而非 `scripting.executeScript`（後者要新增權限）
+- [x] **遮罩 / 模糊模式**：`settings.hideMode`，視覺處理集中在 `entrypoints/content/hideStyle.ts`
+- [x] **軟導航 query 過期**：`entrypoints/content/softNav.ts`
+- [~] **純函式測試**：vitest 已接上（`WxtVitest()` 提供 `@/` alias 與 `wxt/browser` mock），十個測試檔共 313 個 case，涵蓋 `matchKeyword` / `shouldBlock` / `findBlockMatch` / `findAllowMatch` / `parseImport` / `mergeSettings` / `isValidKeyword`，以及 `loadSettings` 的 `allowKeywords` / `hideMode` 遷移路徑（用 `fakeBrowser` 模擬 storage）。誤判清單以 `it.each` 對「真實的內建關鍵字」跑。尚未涵蓋 `normalizeCategoryOrder` / `readLegacyOverrides`
+- [x] **鍵盤快捷鍵**：manifest `commands` —— `_execute_action` 開 popup（零程式碼），另加一個 `toggle-reveal` 由 background 轉訊息給 content script 切換本頁顯示。`commands` 不是 permission，既有使用者不會被要求重新授權
 - [ ] **三態主題**（auto / light / dark）— 目前只有 binary
 - [x] **autocomplete observer 範圍**：已縮小到搜尋框 `<form>`（找不到才退回 `documentElement`），減少 DOM 監聽成本
 
@@ -147,6 +166,11 @@ pnpm test:watch   # 開發時 watch 模式
 
 ## Known issues / 長期維護
 
-- Google CSS 選擇器會隨 Google DOM 改版而失效，需持續觀察並更新 `entrypoints/content/index.ts` 中的 selector
+- **點擊揭露沒有鍵盤路徑**：blur / mask 模式下，「點一下顯示這一張」只綁滑鼠點擊。被遮的 `<img>` 本身不可聚焦，要讓它可聚焦就得在 Google 的搜尋結果裡插入額外 tab stop，那對所有鍵盤使用者都是成本。目前的替代路徑是快捷鍵 `Alt+Shift+S`（放開整頁）與頁面提示上的「顯示」按鈕 —— 不是死路，但單張揭露確實只有滑鼠能做
+
+- Google CSS 選擇器會隨 Google DOM 改版而失效，需持續觀察並更新 `entrypoints/content/selectors.ts` 中的 selector
+- **`blur` / `mask` 只在合成 fixture 上用真實 CSS 引擎驗過，沒有對真實 Google SERP 跑過**。視覺主張成立（去背 PNG 不留剪影、模糊不溢出），但在實際結果頁上的觀感、以及點擊揭露會不會被 Google 的 `jsaction` 干擾，仍未驗證。`hideStyle.ts` 裡三個常數都是可調的旋鈕
+- **A6 的軟導航也還沒對真實 Google 驗過**：udm 分頁 / 篩選 chip 是否真的走 pushState 依 Google 版本而異。500 ms 輪詢讓兩種情況都正確，但若軟導航根本不發生，這支模組就是多的
+- `blur` / `mask` 下圖片仍然會下載 —— 那是「保留版面」的必然代價，popup 的說明有講明
 - content script 內無使用者可見字串，i18n 暫不需要；若未來加 toast / banner 再加
 - 切換 popup 語言時，內建分類的 label / keywords 不會跟著切換（首次安裝就 seed 為單一 locale 的 string）— 這是儲存設計選擇，不是 bug

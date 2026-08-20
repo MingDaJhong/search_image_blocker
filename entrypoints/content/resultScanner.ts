@@ -19,6 +19,7 @@
  * 跟 alt 比對一樣天生抗 DOM rotation。
  */
 import { findBlockMatch, type BlocklistSettings } from "@/composables/blockList";
+import { applyInlineHide, clearInlineHide } from "./hideStyle";
 import { RESULT_IMAGE_SELECTOR, RESULT_ROOT_SELECTOR } from "./selectors";
 
 /**
@@ -93,6 +94,13 @@ export interface ResultScanner {
   readonly firstMatch: { keyword: string; categoryLabel: string | null } | null;
   /** 重新掃描（DOM 變動或設定變更後） */
   rescan(): void;
+  /**
+   * 揭露單獨一張圖（使用者點了它的遮罩）。回傳它是否真的由這個 scanner 隱藏。
+   *
+   * 揭露後不會再被蓋回去：這張圖已經在 `seen` 裡，之後的 rescan 不會重新判斷它。
+   * 這一頁的其他圖不受影響。
+   */
+  reveal(el: Element): boolean;
   /** 停止觀察並還原所有自己隱藏的圖片 */
   disconnect(): void;
 }
@@ -144,7 +152,9 @@ export function scanResults(
         }
         if (!match) continue;
 
-        (el as HTMLElement).style.setProperty("display", "none", "important");
+        // 遮蔽方式跟頁面層級走同一套（hideStyle.ts）—— 對使用者來說「逐筆判斷」
+        // 是判斷邏輯，不該連帶決定看起來長什麼樣
+        applyInlineHide(el as HTMLElement, settings.hideMode);
         hiddenEls.add(el as HTMLElement);
         firstMatch ??= match;
       }
@@ -180,6 +190,12 @@ export function scanResults(
     rescan() {
       scan();
     },
+    reveal(el) {
+      if (!(el instanceof HTMLElement) || !hiddenEls.delete(el)) return false;
+      clearInlineHide(el);
+      onChange();
+      return true;
+    },
     disconnect() {
       disposed = true;
       observer.disconnect();
@@ -187,7 +203,7 @@ export function scanResults(
         clearTimeout(timer);
         timer = 0;
       }
-      for (const el of hiddenEls) el.style.removeProperty("display");
+      for (const el of hiddenEls) clearInlineHide(el);
       hiddenEls.clear();
       firstMatch = null;
     },

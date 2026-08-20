@@ -6,10 +6,17 @@ html,
 body {
   margin: 0;
   padding: 0;
-  width: 360px;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans TC', sans-serif;
   background: #ffffff;
   color-scheme: light;
+}
+
+/*
+ * 360 px 是 popup 專屬的，掛在 body 的 class 上而不是 html/body 本身 ——
+ * 同一份 style.css 也被獨立設定頁載入，寫在 body 上會把設定頁一起夾成 360 px。
+ */
+body.sib-popup {
+  width: 360px;
 }
 
 html.dark,
