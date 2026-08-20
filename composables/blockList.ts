@@ -281,18 +281,28 @@ export function normalizeCategories(stored: unknown): Category[] {
 
 /**
  * 把 stored 的順序與現有 categories 對齊：
- * 過濾掉已刪除的 ID，把新增的補在最後。
+ * 過濾掉已刪除的 ID、去掉重複的、把新增的補在最後。
+ *
+ * 去重是必要的：重複的 ID 會讓同一個分類在拖曳清單裡渲染兩次，
+ * `:item-key` 撞號之後 Vue 會警告、vuedraggable 的排序也會錯亂。
+ * 正常操作進不來（addCategory / removeCategory 都是成對維護的），
+ * 但損毀的 sync 記錄或動過手腳的匯入檔可以。
  */
 export function normalizeCategoryOrder(stored: unknown, categoryIds: string[]): string[] {
   const idSet = new Set(categoryIds)
-  const fromStored = Array.isArray(stored)
-    ? stored.filter((s): s is string => typeof s === 'string' && idSet.has(s))
-    : []
-  const seen = new Set(fromStored)
-  for (const id of categoryIds) {
-    if (!seen.has(id)) fromStored.push(id)
+  const seen = new Set<string>()
+  const order: string[] = []
+  if (Array.isArray(stored)) {
+    for (const value of stored) {
+      if (typeof value !== 'string' || !idSet.has(value) || seen.has(value)) continue
+      seen.add(value)
+      order.push(value)
+    }
   }
-  return fromStored
+  for (const id of categoryIds) {
+    if (!seen.has(id)) order.push(id)
+  }
+  return order
 }
 
 /** 讀取舊版 categoryOverrides，僅用於遷移 */

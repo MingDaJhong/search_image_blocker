@@ -17,6 +17,7 @@ import {
   isValidKeyword,
   loadSettings,
   matchKeyword,
+  normalizeCategoryOrder,
   seedDefaultAllowKeywords,
   seedDefaultCategories,
   shouldBlock,
@@ -459,6 +460,110 @@ describe('例外關鍵字 — 匯入 / 合併', () => {
     const a = { ...DEFAULT_SETTINGS, allowKeywords: ['蛇年', '蟬聯'] }
     const b = { ...DEFAULT_SETTINGS, allowKeywords: ['蟬聯', '蝴蝶結'] }
     expect(mergeSettings(a, b).allowKeywords).toEqual(['蛇年', '蟬聯', '蝴蝶結'])
+  })
+})
+
+describe('normalizeCategoryOrder', () => {
+  it('保留 stored 的順序', () => {
+    expect(normalizeCategoryOrder(['c', 'a', 'b'], ['a', 'b', 'c'])).toEqual(['c', 'a', 'b'])
+  })
+
+  it('過濾掉已經不存在的分類（使用者刪掉了）', () => {
+    expect(normalizeCategoryOrder(['a', 'gone', 'b'], ['a', 'b'])).toEqual(['a', 'b'])
+  })
+
+  it('新增的分類補在最後', () => {
+    expect(normalizeCategoryOrder(['b'], ['a', 'b', 'c'])).toEqual(['b', 'a', 'c'])
+  })
+
+  it('去掉重複的 ID', () => {
+    // 重複的 ID 會讓同一個分類在拖曳清單裡渲染兩次，`:item-key` 撞號之後
+    // Vue 會警告、vuedraggable 的排序也會錯亂。正常操作進不來，
+    // 但損毀的 sync 記錄或動過手腳的匯入檔可以。
+    expect(normalizeCategoryOrder(['a', 'a', 'b', 'a'], ['a', 'b'])).toEqual(['a', 'b'])
+  })
+
+  it.each([[null], [undefined], ['not an array'], [42], [{}]])(
+    'stored 是 %j 時退回分類本身的順序',
+    (stored) => {
+      expect(normalizeCategoryOrder(stored, ['a', 'b'])).toEqual(['a', 'b'])
+    },
+  )
+
+  it('過濾掉非字串的垃圾', () => {
+    expect(normalizeCategoryOrder(['a', 42, null, {}, 'b'], ['a', 'b'])).toEqual(['a', 'b'])
+  })
+
+  it('沒有任何分類時回空陣列', () => {
+    expect(normalizeCategoryOrder(['a'], [])).toEqual([])
+  })
+})
+
+describe('舊版 categoryOverrides 遷移', () => {
+  /**
+   * 更早的版本把使用者對內建分類的修改存在 `categoryOverrides`，
+   * 而不是像現在整份存進 `customCategories`。這條路徑只在
+   * `customCategories` 是空的時候跑 —— 也就是那批使用者第一次開新版的時候。
+   * 搞砸的話他們自訂過的分類名稱與關鍵字會直接消失。
+   */
+  beforeEach(() => {
+    fakeBrowser.reset()
+  })
+
+  const legacy = (categoryOverrides: unknown) =>
+    fakeBrowser.storage.sync.set({
+      [STORAGE_KEY]: { locale: 'zh-TW', categoryOverrides },
+    })
+
+  it('套用舊的 label 覆寫', async () => {
+    await legacy({ insects: { label: '我改過的名字' } })
+    const cat = (await loadSettings()).customCategories.find((c) => c.id === 'insects')
+    expect(cat?.label).toBe('我改過的名字')
+    // 沒被覆寫的欄位維持預設
+    expect(cat?.keywords).toEqual(seedDefaultCategories('zh-TW')[0].keywords)
+  })
+
+  it('套用舊的 keywords 覆寫', async () => {
+    await legacy({ reptiles: { keywords: ['自訂蛇'] } })
+    const cat = (await loadSettings()).customCategories.find((c) => c.id === 'reptiles')
+    expect(cat?.keywords).toEqual(['自訂蛇'])
+    expect(cat?.label).toBe('爬蟲 / 兩棲類') // label 沒動
+  })
+
+  it('略過壞掉的條目，不影響其他分類', async () => {
+    await legacy({
+      insects: null,
+      reptiles: 'not an object',
+      parasites: { label: '好的' },
+    })
+    const cats = (await loadSettings()).customCategories
+    expect(cats.find((c) => c.id === 'parasites')?.label).toBe('好的')
+    expect(cats.find((c) => c.id === 'insects')?.label).toBe('昆蟲 / 節肢動物')
+  })
+
+  it('keywords 裡的非字串被濾掉', async () => {
+    await legacy({ insects: { keywords: ['蟲', 42, null, '蛾'] } })
+    const cat = (await loadSettings()).customCategories.find((c) => c.id === 'insects')
+    expect(cat?.keywords).toEqual(['蟲', '蛾'])
+  })
+
+  it('categoryOverrides 是垃圾時整個忽略，seed 照常', async () => {
+    await legacy('not an object')
+    expect((await loadSettings()).customCategories).toHaveLength(3)
+  })
+
+  it('已經有 customCategories 時完全不看 categoryOverrides', async () => {
+    // 遷移只該發生一次；已經遷過的使用者再套一次會把他們之後的修改蓋掉
+    await fakeBrowser.storage.sync.set({
+      [STORAGE_KEY]: {
+        locale: 'zh-TW',
+        customCategories: [{ id: 'insects', label: '現在的名字', keywords: ['蟲'] }],
+        categoryOverrides: { insects: { label: '舊的名字' } },
+      },
+    })
+    const cats = (await loadSettings()).customCategories
+    expect(cats).toHaveLength(1)
+    expect(cats[0].label).toBe('現在的名字')
   })
 })
 

@@ -76,32 +76,32 @@ pnpm sync:privacy
 1. 跑 `pnpm dev`，WXT 會自動開啟 Chrome 並載入 extension
 2. 在 Chrome 開 [google.com/search?q=昆蟲](https://www.google.com/search?q=昆蟲) 測試
 3. 點擊瀏覽器右上角 extension 圖示開啟 popup 設定關鍵字
-4. 修改後重新整理搜尋頁即可看到效果
+4. 改任何設定都會立刻反映在已開啟的搜尋頁，不需要重新整理
+
+發布前的完整走查路徑見下方「1.1.0 發布前必做」。
 
 ## 功能說明
 
 - **總開關（暫停）**：popup 右上選單可一鍵暫停／繼續，content script 真正卸載 CSS 與 observer，不留任何殘餘成本
 - **設定即時生效**：修改任何選項立刻反映在現有頁面，無需重新整理
 - **全域阻擋**：不論搜尋什麼都隱藏圖片
-- **區塊類型**：勾選要隱藏的區塊（圖片橫幅、搜尋結果縮圖、影片、搜尋建議縮圖、相關問題、知識面板）
+- **區塊類型**：勾選要隱藏的區塊，分兩組 —— 「圖片與影片」（搜尋結果縮圖、搜尋建議縮圖、圖片分頁篩選列縮圖、圖片輪播／橫幅、影片卡片，預設全開）與「整塊區域」（相關問題、知識面板，會連文字一起隱藏，預設全關）
 - **觸發分類**：內建 3 個策展關鍵字包預設啟用（昆蟲、爬蟲、寄生蟲），勾選即用；支援拖曳排序
 - **預設範本**：「血腥／暴力」與「醫療／傷口」改為使用者主動加入的 `+ 範本` chips，避免首次安裝就 ship 敏感關鍵字列表
 - **自訂分類**：可新增、重新命名、刪除分類，並在詳情頁管理該分類的關鍵字
 - **自訂關鍵字**：全域自訂關鍵字
 - **文字系統感知的比對**：拉丁／西里爾／希臘字母關鍵字走「詞邊界 + 簡單複數」比對，中日韓等無詞邊界的語言維持 substring。避免 `moth` 誤中 `mother's day`、`boa` 誤中 `keyboard`、`rash` 誤中 `car crash` 這類讓整頁圖片無故消失的誤判
 - **例外關鍵字**：命中就一律放行，優先於自訂關鍵字與分類。首次安裝依語系帶入一份策展清單（zh-TW 26 條、en 31 條），解掉中文沒有詞邊界、比對層改不掉的誤判 —— `蟬聯冠軍`、`蛇年運勢`、`螞蟻上樹`、`鱷魚牌`、`蜘蛛人`、`癌症險` 等不再被誤擋。優先序為 `暫停 > 全域阻擋 > 例外 > 關鍵字／分類`（全域阻擋刻意排在例外之上，它是不該有洞的核彈按鈕）
-- **放行原因顯示**：popup 除了顯示「目前阻擋中：關鍵字 X」，也會在命中例外時顯示「此頁未阻擋：命中例外關鍵字 X」
-- **阻擋狀態顯示**：popup 偵測目前 active tab 的搜尋字串，顯示觸發了哪個關鍵字 / 分類
 - **autocomplete 智慧處理**：搜尋建議下拉用 MutationObserver 逐 option 評估，不會把無關的 suggestion 縮圖一起擋掉；右側知識預覽則用搜尋框輸入字 + 任一 option 命中當訊號
 - **多語系**：popup 支援繁體中文 / English 切換（首次安裝跟 `navigator.language`）
 - **深色模式**：popup 支援淺色 / 深色切換（首次安裝跟系統偏好，防閃爍）
 - **設定同步**：使用 `chrome.storage.sync`，跨裝置自動同步
 - **匯入 / 匯出設定**：popup 選單提供 JSON 下載 / 上傳，方便備份與跨機遷移；匯入時可選「合併」（把對方的關鍵字 / 分類加進來，保留個人 UI 偏好）或「取代」（清除目前所有設定再套用），避免誤點丟失自訂內容
-- **儲存配額顯示**：footer 即時顯示已使用 KB / 100KB 進度條，70% 轉黃、90% 轉紅
+- **儲存配額顯示**：在「關鍵字」分頁最下方顯示已使用 KB / 100KB 進度條，70% 轉黃、90% 轉紅（它量的就是那幾份關鍵字清單，放在旁邊才有意義）
 - **輸入驗證**：新增關鍵字 / 分類時，空白、重複、過長（關鍵字 50 字、分類名稱 30 字）會即時 inline 提示，2.5 秒後自動消失；輸入框同步綁 `maxlength` 從 DOM 層擋住 paste / IME 過長字串
 - **逐筆結果比對**：搜尋字沒命中任何關鍵字時，改逐筆判斷每一張圖，只隱藏命中那一張。補的是 query 層級阻擋的盲點 —— 搜「我家牆上這是什麼」時 query 一個關鍵字都不會命中，但結果標題全是「蜘蛛」，那正是最需要保護的時刻。兩個訊號：**圖片自己的 alt / title / aria-label**（含外層連結的），以及**從圖片往上走找到的所屬結果文字**。兩者都**不依賴任何 Google class / jsname**，天生抗 DOM 改版
 - **圖片分頁覆蓋**：alt 比對特別重要 —— 圖片分頁（`udm=2`）的圖磚周圍幾乎沒有文字，但 alt 通常是來源頁標題，而那正是這個產品最關鍵的頁面
-- **主畫面分三頁**：`方式`（怎麼擋）／`關鍵字`（擋什麼）／`區塊`（擋哪裡）。狀態卡固定在分頁列上方常駐 —— 它是頁面層級的讀數不是設定，三頁都看得到「這一頁怎麼了」；沒被阻擋時它也會說明原因（「搜尋字沒有命中任何關鍵字」）。隱私權政策常駐於 footer。獨立設定頁不分頁，一次攤開全部（同一份 App.vue，靠 `wide` 切換）
+- **主畫面分三頁**：`方式`（怎麼擋）／`關鍵字`（擋什麼）／`區塊`（擋哪裡）。狀態卡固定在分頁列上方常駐 —— 它是頁面層級的讀數不是設定，三頁都看得到「這一頁怎麼了」，四種狀態：阻擋中 / 已顯示 / 沒被阻擋 / 不在搜尋頁。隱藏數量與命中原因**向 content script 取得**，因為逐筆結果比對是在頁面裡跑的，popup 光看搜尋字算不出來；問不到時只顯示狀態不顯示數字（`0` 的意思是「檢查過、一個都沒擋到」，跟「問不到」不能混為一談）。卡片上的「本頁顯示」與快捷鍵、頁面提示走同一個訊息。隱私權政策常駐於 footer。獨立設定頁不分頁，一次攤開全部（同一份 App.vue，靠 `wide` 切換）
 - **頁面提示**：搜尋頁左下角顯示「已隱藏 N 個區塊 · 關鍵字「蛇」」，一鍵「顯示」可在本頁放開圖片（只影響這次載入、不改設定、不寫任何儲存，重新整理即恢復）。若阻擋啟用卻數到 0 個區塊，提示會直接說「沒有找到可隱藏的區塊」—— 在沒有任何遙測的前提下，這是使用者能發現 Google 改版的唯一管道。可於 popup 關閉
 - **遮蔽方式（hide / blur / mask）**：`hide` 整塊移除（版面收起、圖片不下載，1.0.x 的行為，也是預設值）；`blur` 保留版面但看不出形狀；`mask` 蓋成純色方塊，連輪廓都不露。blur 與 mask 可以在搜尋頁**點一下被遮住的圖，只顯示那一張**（刻意是點擊而不是 hover —— 對這個族群「滑過去就露出來」比看不到更糟）。`<video>` 在三種模式下一律直接隱藏，否則它會留在版面上、hover 會播、還會出聲
 - **鍵盤快捷鍵**：`Alt+Shift+B` 開設定面板、`Alt+Shift+S` 切換本頁顯示 / 復原（可在 `chrome://extensions/shortcuts` 改）。設定頁會列出目前實際的鍵位（讀 `commands.getAll()`，不是寫死 manifest 的建議值）
@@ -113,56 +113,45 @@ pnpm sync:privacy
 - **多 TLD 支援**：覆蓋 16 個 Google 地區網域（.com / .com.tw / .com.hk / .co.jp / .co.kr / .com.sg / .co.uk / .com.au / .ca / .co.in / .de / .fr / .es / .it / .com.br / .com.mx）
 - **Dev 模式 selector 失效偵測**：`pnpm dev` 模式下 content script 啟動 2 秒後會檢查所有阻擋 selector 是否真的找到元素，全部 0 命中時 `console.warn` 提醒（production build 自動 strip）
 
-## 上架前完善計畫
+## 版本狀態
 
-依優先級排列，可逐條勾選實作。
+| | 版本 | 說明 |
+| --- | --- | --- |
+| 已上架 | `1.0.2` | Chrome Web Store 上目前的版本 |
+| 本地 | `1.1.0` | 尚未發布，在 `feat/post-launch-hardening` 分支 |
 
-### P0 — 上架前必做
+已完成的功能請看上面的「功能說明」，這裡只記還沒做完、刻意不做、以及發布前一定要做的事。
 
-- [x] **修改設定即時生效**：content script 透過單一 `applyState()` 處理 boot 與 `browser.storage.onChanged`，動態更新 `sib-block-style` 並重新 attach / disconnect autocomplete observer；footer 不再有「需要重新整理」提示
-- [x] **總開關 / 暫停按鈕**：`BlocklistSettings.paused`，paused 時 `applyState` 早退、移除所有 CSS、disconnect observer、清掉 inline `visibility:hidden`。Popup header 選單有 toggle + 暫停 banner
-- [x] **拆分圖片相關 selector**：`blockTypes.images`（圖片橫幅）與 `blockTypes.thumbnails`（搜尋結果縮圖）已拆成兩個獨立選項
-- [x] **預設分類審查風險**：採第三選項「從程式碼移除改成『+ 範本』按鈕」— `gore`、`medical` 移到 `PRESET_TEMPLATES`，不再 auto-seed，使用者於 popup 主動加入
-- [x] **隱私權政策頁面**：`entrypoints/privacy/index.html` 已建立並由 popup footer 連結（路徑為 `/privacy.html`，extension 內可直接開）
-- [x] **隱私權政策外部 URL**：GitHub Pages 部署於 [https://mingdajhong.github.io/search_image_blocker/privacy.html](https://mingdajhong.github.io/search_image_blocker/privacy.html)；repo 根目錄的 `privacy.html` 是 `entrypoints/privacy/index.html` 的副本，內容變動後兩處要同步
-- [ ] 至少一張螢幕截圖（1280x800 或 640x400）
-- [ ] Chrome Web Store listing：詳細描述、簡短描述、分類
-- [ ] 註冊 Chrome Web Store Developer 帳號（一次性 $5 USD）
+## 1.1.0 發布前必做
 
-### P1 — 強烈建議
+**全部都是「只在合成 DOM 或單機截圖驗過」的東西 —— 這是目前唯一擋在發布前的關卡。**
 
-- [x] **匯入 / 匯出設定**：popup 選單下載 `sib-settings-YYYY-MM-DD.json`，上傳時走 `parseImport()` 做 schema 正規化，成功 / 失敗都有 banner 回饋
-- [x] **儲存配額用量顯示**：`chrome.storage.sync.getBytesInUse()` 在 popup footer 顯示 `X.X / 100 KB` 進度條，70% 轉黃、90% 轉紅
-- [~] **關鍵字 enable / disable**：評估後決定不做 — 全域 Pause 已涵蓋「臨時想搜被擋的詞」場景；per-keyword toggle 與既有 add / remove 模式並存會讓心智模型混亂（同一頁面：分類用 toggle、關鍵字用 toggle + 刪除？）。若未來再有需求，較好方向是「關鍵字組合的快速匯入 / 匯出」
-- [x] **輸入驗證 + 重複回饋**：`addKeyword` / `addCatKeyword` 回傳 `'added' | 'duplicate' | 'empty'`，UI 收到非 `'added'` 時 input 邊框轉紅並顯示對應提示文案，2.5 秒後自動消失
-- [x] **autocomplete observer 效能**：`requestAnimationFrame` debounce 合併同 frame mutation；listbox 不存在時提早返回；觀察根縮小到搜尋框 `<form>`
-- [x] **「還原預設分類」按鈕**：新增分類表單裡的「+ 還原 <分類名>」chip，僅當該內建分類目前不存在時才顯示，點擊用當前 locale 重新 seed `label` / `keywords`
+- [ ] **真實 Google SERP 走一輪**。一條路徑幾乎全覆蓋：
+  `pnpm dev` → 搜「蝴蝶」（query 命中）→ 切到圖片分頁（驗軟導航 A6）→ 換成 mask 模式 → 點一張圖（驗點擊揭露）→ 按 `Alt+Shift+S`（驗快捷鍵）→ 搜「像是蛛」（query 不命中但結果命中，驗逐筆比對與 popup／頁面提示的狀態同步）→ 開設定頁 → 按診斷
+- [ ] **逐筆比對會不會過度隱藏或完全沒作用**。`MAX_CONTEXT_CHARS`（400）與 `MAX_WALK_UP`（8）是憑合成 DOM 訂的，真實結果容器的文字量可能差很多。兩個都是可調的旋鈕；真的不行也可以把 `perResultBlock` 預設改成關閉（一行）
+- [ ] **點擊揭露會不會誤攔 Google 的正常點擊**。用了 `stopImmediatePropagation`，這是風險最高的一項
+- [ ] **圖片分頁（`udm=2`）的實際覆蓋**。那是這個產品最關鍵的頁面，而它的容器結構我沒有實測過
+- [ ] **blur / mask 的實際觀感**，以及 popup 三個分頁、狀態卡四種狀態的版面
+- [ ] 更新 Chrome Web Store listing 的截圖與版本說明（1.1.0 的畫面與 1.0.2 差很多）
 
-### P2 — Nice to have
+## 已評估後決定不做
 
-- [x] **搜尋頁阻擋回饋**：頁面左下角提示（closed shadow DOM），顯示隱藏數量與命中原因、提供「本頁顯示」逃生口，並在數到 0 時直接告知 selector 可能失效。由 `settings.pageIndicator` 控制，預設開啟
-- [x] **selector 抽檔 + 守門測試**：`entrypoints/content/selectors.ts` 集中所有 Google DOM selector，`selectors.test.ts` 用 happy-dom 讓真正的 CSS 引擎解析每一個 selector（語法錯誤會紅），並斷言開場遮蔽涵蓋預設設定會擋的一切
-- [x] **TLD 清單單一來源**：`composables/googleTlds.ts`（零 import，Node / popup / 測試共用）。content script 的 `matches` 因為 WXT 靜態分析仍是手寫字面量，但改由測試讀原始碼斷言兩者一致
-- [x] **「精確匹配」開關**：改用「依文字系統自動分流 + 例外清單」取代逐關鍵字開關。`matchKeyword()` 對拉丁字母做詞邊界比對（允許 `s` / `es` 複數），CJK 維持 substring；CJK 改不掉的誤判（`蛇` 命中 `蛇年運勢`）由 `settings.allowKeywords` 在上層解決，並內建一份策展清單，使用者不必做任何設定
-- [x] **i18n 拆檔**：`messages` 已抽到 `entrypoints/popup/i18n.ts`，`Messages` 型別由 `(typeof messages)[Locale]` 推出，App.vue 不再內嵌字串表
-- [x] **獨立設定頁**：`entrypoints/options/` 掛同一個 `App.vue`（`wide=true`），不另開一份元件避免與 popup 漂移。附關鍵字篩選與批次貼上
-- [x] **使用者可觸發的失效診斷**：popup 選單一顆按鈕，走 `tabs.sendMessage` 而非 `scripting.executeScript`（後者要新增權限）
-- [x] **遮罩 / 模糊模式**：`settings.hideMode`，視覺處理集中在 `entrypoints/content/hideStyle.ts`
-- [x] **軟導航 query 過期**：`entrypoints/content/softNav.ts`
-- [~] **純函式測試**：vitest 已接上（`WxtVitest()` 提供 `@/` alias 與 `wxt/browser` mock），十個測試檔共 313 個 case，涵蓋 `matchKeyword` / `shouldBlock` / `findBlockMatch` / `findAllowMatch` / `parseImport` / `mergeSettings` / `isValidKeyword`，以及 `loadSettings` 的 `allowKeywords` / `hideMode` 遷移路徑（用 `fakeBrowser` 模擬 storage）。誤判清單以 `it.each` 對「真實的內建關鍵字」跑。尚未涵蓋 `normalizeCategoryOrder` / `readLegacyOverrides`
-- [x] **鍵盤快捷鍵**：manifest `commands` —— `_execute_action` 開 popup（零程式碼），另加一個 `toggle-reveal` 由 background 轉訊息給 content script 切換本頁顯示。`commands` 不是 permission，既有使用者不會被要求重新授權
-- [ ] **三態主題**（auto / light / dark）— 目前只有 binary
-- [x] **autocomplete observer 範圍**：已縮小到搜尋框 `<form>`（找不到才退回 `documentElement`），減少 DOM 監聽成本
+- **關鍵字逐條 enable / disable**：全域暫停已涵蓋「臨時想搜被擋的詞」；per-keyword toggle 與既有的 add / remove 並存會讓心智模型混亂（同一頁面：分類用 toggle、關鍵字用 toggle 加刪除？）。**例外關鍵字**是更好的方向，已實作 —— 「要擋什麼」和「不要擋什麼」是兩份清單，比每項掛一個三態開關清楚
+- **三態主題（auto / light / dark）**：目前是 binary。要做需要一個 `prefers-color-scheme` 監聽器與 `Theme` 的新值，收益相對低
+- **本地 AI 影像辨識**：關鍵字永遠擋不到「我家牆上這是什麼」這種查詢，方向是對的，但在 MV3 content script 裡跑模型的成本與 CWS 審查風險不成比例。逐筆結果比對（B3）＋ 圖片說明比對（B4）已經吃掉這個情境的大部分
 
-### 安全性檢查
+## 安全性檢查
 
 - [x] Vue text interpolation `{{ }}` 自動 escape，沒有 `v-html` 使用
-- [x] 權限最小化：只有 `storage` + 限定 `google.com` / `google.com.tw` host
+- [x] **權限最小化**：`permissions` 只有 `storage`；`host_permissions` 限定 16 個 Google 網域。1.1.0 新增的 `commands` / `background` / `options_ui` **都不是 permission**，既有使用者不會被要求重新授權
+- [x] **沒有 `web_accessible_resources`**：頁面提示的圖示走 Vite 內嵌 data URI 而不是 `runtime.getURL()`，後者需要把檔案列進 `web_accessible_resources`，等於讓 google.com 可以探測這個擴充功能是否安裝
 - [x] `loadSettings` 有逐欄位 type guard，stored 內容 prototype pollution 不會穿過
-- [x] CSS selector 全為 hardcoded，沒有來自使用者輸入的字串
-- [x] 無 ReDoS 風險：`matchKeyword` 用的三個 regex（`WORD_DELIMITED` / `WORD_CHAR` / `PLURAL_SUFFIX`）都是模組層級常數，沒有巢狀量詞，且**不由使用者輸入組成** — 關鍵字比對走 `indexOf` + 前後字元檢查，不是動態組 regex
+- [x] CSS selector 全為 hardcoded，沒有來自使用者輸入的字串；`selectors.test.ts` 讓真正的 CSS 引擎解析每一個，語法錯誤會紅
+- [x] **無 ReDoS 風險**：`matchKeyword` 用的三個 regex（`WORD_DELIMITED` / `WORD_CHAR` / `PLURAL_SUFFIX`）都是模組層級常數、沒有巢狀量詞，且**不由使用者輸入組成** —— 關鍵字比對走 `indexOf` 加前後字元檢查
+- [x] **頁面提示用 closed shadow root**：提示上會顯示使用者的關鍵字（黑名單資料），closed 讓 Google 自己的 script 讀不到
+- [x] **「本頁顯示」不持久化**：只活在 content script 這次載入的記憶體裡，不寫任何儲存，所以沒有隱私成本
 - [x] 完整 icon（16/32/48/96/128 px）
-- [x] 使用者輸入長度上限：`MAX_KEYWORD_LEN = 50` / `MAX_LABEL_LEN = 30`，input 端 `maxlength` + composable 端 `'too_long'` 雙層擋；`loadSettings` / `parseImport` 也過濾過長字串，防 storage 被惡意 import 灌爆
+- [x] 使用者輸入長度上限：`MAX_KEYWORD_LEN = 50` / `MAX_LABEL_LEN = 30`，input 端 `maxlength` 加 composable 端 `'too_long'` 雙層擋；`isValidKeyword` 在每個儲存邊界過濾空字串與過長字串，防損毀的 storage 或惡意匯入檔
 - [x] 確認 `wxt zip` 產出不含 `.DS_Store` 或系統垃圾檔：WXT build flow 自動過濾，已用 `unzip -l | grep DS_Store` 驗證
 
 ## Known issues / 長期維護
