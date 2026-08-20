@@ -50,6 +50,20 @@ describe('i18n 兩個語系的鍵一致', () => {
   })
 })
 
+describe('沒有孤兒文案', () => {
+  it('每一條 i18n 都真的被用到', () => {
+    // 190+ 條文案靠人眼看不出哪條沒人用。刪掉功能時很容易漏掉對應的字串，
+    // 留著會讓下一個人以為「同一件事有兩種說法」而選錯。
+    const sources = ['entrypoints/popup/App.vue', 'entrypoints/popup/CategoryDetail.vue', 'entrypoints/popup/KeywordSection.vue']
+      .map(read)
+      .join('\n')
+    const orphans = Object.keys(messages['zh-TW']).filter(
+      (key) => !new RegExp(`\\bt(?:\\.value)?\\.${key}\\b`).test(sources),
+    )
+    expect(orphans).toEqual([])
+  })
+})
+
 describe('保留命令名稱依 manifest 版本切換', () => {
   it('wxt.config.ts 同時處理 MV3 與 MV2 的「開啟 popup」命令', () => {
     // MV3 是 `_execute_action`，MV2（Firefox 目標）是 `_execute_browser_action`。

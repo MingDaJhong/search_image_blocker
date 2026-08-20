@@ -10,7 +10,6 @@ export const messages = {
     perResultBlockDesc: "搜尋字沒命中時，改看每一筆結果的文字與圖片說明，只擋命中那筆的圖",
     pageIndicator: "頁面提示",
     pageIndicatorDesc: "在搜尋頁角落顯示隱藏了幾個區塊，可一鍵本頁顯示",
-    blockTypesTitle: "要隱藏的區塊",
     blockImages: "圖片輪播 / 橫幅",
     blockThumbnails: "搜尋結果縮圖",
     blockVideos: "影片卡片",
@@ -67,13 +66,25 @@ export const messages = {
     errorEmpty: "請輸入關鍵字",
     errorDuplicate: "此關鍵字已存在",
     errorTooLong: "關鍵字過長（上限 50 字元）",
-    blockedByMsg: (kw: string, cat: string | null) =>
-      !kw
-        ? "目前阻擋中：全域阻擋已啟用"
-        : cat
-          ? `目前阻擋中：關鍵字「${kw}」（${cat}）`
-          : `目前阻擋中：自訂關鍵字「${kw}」`,
-    allowedByMsg: (kw: string) => `此頁未阻擋：命中例外關鍵字「${kw}」`,
+    tabMode: "方式",
+    tabKeywords: "關鍵字",
+    tabBlocks: "區塊",
+    blockGroupMedia: "圖片與影片",
+    blockGroupArea: "整塊區域",
+    blockGroupAreaHint: "連同文字一起隱藏，預設關閉",
+    statusBlockedTitle: (n: number | null) =>
+      n === null ? "這一頁正在阻擋" : `這一頁已隱藏 ${n} 個區塊`,
+    statusBlockedDetail: (kw: string, cat: string | null) =>
+      !kw ? "全域阻擋" : cat ? `關鍵字「${kw}」· ${cat}` : `自訂關鍵字「${kw}」`,
+    statusIdleTitle: "這一頁沒有被阻擋",
+    statusIdleDetail: "搜尋字沒有命中任何關鍵字",
+    statusAllowedDetail: (kw: string) => `命中例外關鍵字「${kw}」`,
+    statusRevealedTitle: "已顯示本頁圖片",
+    statusRevealedDetail: "重新整理就會恢復隱藏",
+    statusOffsiteTitle: "目前不在 Google 搜尋頁",
+    statusOffsiteDetail: "到 Google 搜尋任何東西就會開始運作",
+    revealBtn: "本頁顯示",
+    restoreBtn: "復原",
     hideModeTitle: "遮蔽方式",
     hideModeHint:
       "模糊與遮罩會保留版面，並且可以在搜尋頁點一下被遮住的圖，只顯示那一張；代價是圖片仍然會下載。影片一律直接隱藏，避免 hover 自動播放。",
@@ -114,7 +125,6 @@ export const messages = {
     perResultBlockDesc: "When the query itself doesn't match, check each result's text and image descriptions, hiding only that result's images",
     pageIndicator: "On-page indicator",
     pageIndicatorDesc: "Show what was hidden, with a one-click reveal for this page",
-    blockTypesTitle: "What to hide",
     blockImages: "Image carousel / banner",
     blockThumbnails: "Search result thumbnails",
     blockVideos: "Video cards",
@@ -172,13 +182,31 @@ export const messages = {
     errorEmpty: "Please enter a keyword",
     errorDuplicate: "This keyword already exists",
     errorTooLong: "Keyword too long (50 characters max)",
-    blockedByMsg: (kw: string, cat: string | null) =>
+    tabMode: "How",
+    tabKeywords: "Keywords",
+    tabBlocks: "Elements",
+    blockGroupMedia: "Images & video",
+    blockGroupArea: "Whole sections",
+    blockGroupAreaHint: "Hides the text along with it — off by default",
+    statusBlockedTitle: (n: number | null) =>
+      n === null
+        ? "Blocking on this page"
+        : `${n} block${n === 1 ? "" : "s"} hidden here`,
+    statusBlockedDetail: (kw: string, cat: string | null) =>
       !kw
-        ? "Blocking active: global block is on"
+        ? "Block all is on"
         : cat
-          ? `Blocking active: keyword "${kw}" (${cat})`
-          : `Blocking active: custom keyword "${kw}"`,
-    allowedByMsg: (kw: string) => `Not blocked: matched exception "${kw}"`,
+          ? `Keyword "${kw}" · ${cat}`
+          : `Custom keyword "${kw}"`,
+    statusIdleTitle: "Nothing blocked here",
+    statusIdleDetail: "The search terms match none of your keywords",
+    statusAllowedDetail: (kw: string) => `Matched exception "${kw}"`,
+    statusRevealedTitle: "Images shown on this page",
+    statusRevealedDetail: "Reload to hide them again",
+    statusOffsiteTitle: "Not on a Google search page",
+    statusOffsiteDetail: "Search for anything on Google and it starts working",
+    revealBtn: "Show",
+    restoreBtn: "Undo",
     hideModeTitle: "How to hide",
     hideModeHint:
       "Blur and mask keep the layout and let you click a covered image to reveal just that one — but the images still download. Videos are always removed outright so hover previews can never play.",

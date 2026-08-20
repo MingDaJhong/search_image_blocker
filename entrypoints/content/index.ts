@@ -283,6 +283,7 @@ export default defineContentScript({
           queryBlocked: !settings.paused && shouldBlock(query, settings),
           cssMatches: countBlockedElements(document, settings.blockTypes),
           scannerMatches: resultScanner?.hiddenCount ?? 0,
+          scannerMatch: resultScanner?.firstMatch ?? null,
           revealed,
         };
         return Promise.resolve(report);

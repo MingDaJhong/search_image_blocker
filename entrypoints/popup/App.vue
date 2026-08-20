@@ -21,6 +21,10 @@ import {
 import { GOOGLE_SEARCH_MATCHES, isGoogleSearchUrl } from "@/composables/googleTlds";
 import {
   DIAGNOSE_MESSAGE,
+  TOGGLE_REVEAL_MESSAGE,
+  hiddenCountOf,
+  summarizePageStatus,
+  type PageStatus,
   summarizeDiagnosis,
   type DiagnosisReport,
   type DiagnosisVerdict,
@@ -122,6 +126,8 @@ watch(loaded, async (isLoaded) => {
   } catch {
     // tabs API 不可用或 URL 無法存取
   }
+  // 狀態卡要顯示「已隱藏幾個」，那個數字只有 content script 知道
+  applyReport(await fetchReport());
 });
 
 /**
@@ -235,6 +241,107 @@ const orderedCategories = computed<Category[]>({
 
 const t = computed<Messages>(() => messages[settings.value.locale]);
 
+/**
+ * 主畫面的分頁。三格對應三個問題：方式（怎麼擋）／關鍵字（擋什麼）／區塊（擋哪裡）。
+ *
+ * 狀態卡刻意**不在**任何一格裡 —— 它是頁面層級的讀數而不是設定，放進分頁的話
+ * 標籤永遠會顧此失彼，而且切到別格就看不到「這一頁怎麼了」。
+ */
+type TabId = "mode" | "keywords" | "blocks";
+const activeTab = ref<TabId>("mode");
+const tabDefs = computed(() => [
+  { id: "mode" as const, label: t.value.tabMode },
+  { id: "keywords" as const, label: t.value.tabKeywords },
+  { id: "blocks" as const, label: t.value.tabBlocks },
+]);
+
+/**
+ * 寬版面（獨立設定頁）不分頁，一次攤開全部 —— 那裡空間夠，
+ * 分頁只會讓使用者多點三次才看得完。
+ */
+function showTab(id: TabId): boolean {
+  return props.wide || activeTab.value === id;
+}
+
+/**
+ * 要隱藏的區塊，分成「夾帶圖片的」與「會連文字一起隱藏的整塊區域」。
+ * 後者預設關閉且行為明顯不同，跟前五項並排成一列時看不出差別。
+ */
+const blockGroups = computed(() => [
+  {
+    title: t.value.blockGroupMedia,
+    hint: "",
+    items: [
+      { key: "thumbnails" as const, label: t.value.blockThumbnails },
+      { key: "searchPreview" as const, label: t.value.blockSearchPreview },
+      { key: "imageFilterBar" as const, label: t.value.blockImageFilterBar },
+      { key: "images" as const, label: t.value.blockImages },
+      { key: "videos" as const, label: t.value.blockVideos },
+    ],
+  },
+  {
+    title: t.value.blockGroupArea,
+    hint: t.value.blockGroupAreaHint,
+    items: [
+      { key: "relatedQuestions" as const, label: t.value.blockRelatedQuestions },
+      { key: "knowledgePanel" as const, label: t.value.blockKnowledgePanel },
+    ],
+  },
+]);
+
+/** 這一頁現在到底怎麼了 —— 判斷邏輯在 diagnostics.ts，那裡有測試 */
+const pageStatus = computed<PageStatus>(() =>
+  summarizePageStatus({
+    onSearchPage: currentSearchQuery.value !== null,
+    report: lastReport.value,
+    queryBlocked: blockMatch.value !== null,
+    queryAllowed: allowMatch.value !== null,
+  }),
+);
+
+/** 造成阻擋的命中：query 層級優先，其次是逐筆比對回報的 */
+const blockReason = computed(() => blockMatch.value ?? scannerMatch.value);
+
+const statusTitle = computed(() => {
+  if (revealedOnPage.value) return t.value.statusRevealedTitle;
+  switch (pageStatus.value) {
+    case "blocked":
+      return t.value.statusBlockedTitle(hiddenCount.value);
+    case "offsite":
+      return t.value.statusOffsiteTitle;
+    default:
+      return t.value.statusIdleTitle;
+  }
+});
+
+const statusDetail = computed(() => {
+  if (revealedOnPage.value) return t.value.statusRevealedDetail;
+  switch (pageStatus.value) {
+    case "blocked":
+      return t.value.statusBlockedDetail(
+        blockReason.value?.keyword ?? "",
+        blockReason.value?.categoryLabel ?? null,
+      );
+    case "allowed":
+      return t.value.statusAllowedDetail(allowMatch.value ?? "");
+    case "offsite":
+      return t.value.statusOffsiteDetail;
+    default:
+      return t.value.statusIdleDetail;
+  }
+});
+
+/** 只有真的擋到東西時才給揭露按鈕 —— 沒東西可放的話那顆鈕是騙人的 */
+const canReveal = computed(
+  () => pageStatus.value === "blocked" || revealedOnPage.value,
+);
+
+const statusToneClass = computed(() =>
+  pageStatus.value === "blocked" && !revealedOnPage.value
+    ? "bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-300"
+    : "bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-300",
+);
+
 const hideModeOptions = computed<
   Array<{ value: HideMode; label: string; desc: string }>
 >(() => [
@@ -259,20 +366,67 @@ const diagVerdict = ref<DiagnosisVerdict | null>(null);
 const diagCount = ref(0);
 let diagTimer = 0;
 
-async function handleDiagnose() {
-  showHeaderMenu.value = false;
-  let report: DiagnosisReport | null = null;
+/**
+ * content script 回報的實際狀況。拿不到（非搜尋頁、或分頁在安裝前就開著）
+ * 時維持 null —— 狀態卡就不顯示數字，而不是顯示一個編出來的 0。
+ */
+const hiddenCount = ref<number | null>(null);
+const revealedOnPage = ref(false);
+/** 逐筆比對命中的關鍵字（query 層級看不到，只有 content script 知道） */
+const scannerMatch = ref<{ keyword: string; categoryLabel: string | null } | null>(
+  null,
+);
+/** 最近一次回報，供 summarizePageStatus 判讀 */
+const lastReport = ref<DiagnosisReport | null>(null);
+
+function applyReport(report: DiagnosisReport | null) {
+  lastReport.value = report;
+  if (!report) {
+    hiddenCount.value = null;
+    revealedOnPage.value = false;
+    scannerMatch.value = null;
+    return;
+  }
+  hiddenCount.value = hiddenCountOf(report);
+  revealedOnPage.value = report.revealed;
+  scannerMatch.value = report.scannerMatch;
+}
+
+/** 狀態卡上的「本頁顯示 / 復原」——與快捷鍵、頁面提示走同一個訊息 */
+async function handleToggleReveal() {
   try {
     const tab = await findSearchTab();
-    if (tab?.id !== undefined) {
-      report = (await browser.tabs.sendMessage(tab.id, {
-        type: DIAGNOSE_MESSAGE,
-      })) as DiagnosisReport;
-    }
+    if (tab?.id === undefined) return;
+    const res = (await browser.tabs.sendMessage(tab.id, {
+      type: TOGGLE_REVEAL_MESSAGE,
+    })) as { revealed?: boolean } | undefined;
+    revealedOnPage.value = res?.revealed ?? !revealedOnPage.value;
+  } catch {
+    // content script 不在，忽略
+  }
+}
+
+/**
+ * 向 content script 要一份現況報告。診斷按鈕與常駐狀態卡共用同一條管線 ——
+ * 兩者問的是同一件事，沒有理由開兩套。
+ */
+async function fetchReport(): Promise<DiagnosisReport | null> {
+  try {
+    const tab = await findSearchTab();
+    if (tab?.id === undefined) return null;
+    return (await browser.tabs.sendMessage(tab.id, {
+      type: DIAGNOSE_MESSAGE,
+    })) as DiagnosisReport;
   } catch {
     // 這個分頁沒有 content script（安裝前就開著、或不是搜尋頁）
-    report = null;
+    return null;
   }
+}
+
+async function handleDiagnose() {
+  showHeaderMenu.value = false;
+  const report = await fetchReport();
+  applyReport(report);
   diagCount.value = report
     ? report.queryBlocked
       ? report.cssMatches
@@ -774,18 +928,64 @@ function cancelImport() {
         >
       </div>
 
-      <!-- 目前阻擋來源提示 -->
+      <!--
+        儲存失敗是全域錯誤，任何分頁都可能觸發 —— 放在常駐區，
+        不能因為使用者剛好切到別格就看不到。
+      -->
       <div
-        v-if="blockMatch"
-        class="mb-4 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md text-xs text-blue-700 dark:text-blue-300"
+        v-if="saveError"
+        class="mb-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-xs text-red-600 dark:text-red-400"
       >
-        {{ t.blockedByMsg(blockMatch.keyword, blockMatch.categoryLabel) }}
+        {{ t.saveError }}
       </div>
+
+      <!--
+        這一頁的狀態：常駐在分頁列上方，不屬於任何一格。
+        它是頁面層級的讀數而不是設定 —— 放進分頁的話標籤永遠顧此失彼，
+        而且切到別格就看不到「這一頁怎麼了」。
+      -->
       <div
-        v-else-if="allowMatch"
-        class="mb-4 px-3 py-2 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-md text-xs text-green-700 dark:text-green-300"
+        v-if="!settings.paused"
+        :class="[
+          'mb-3 p-3 rounded-lg border flex items-center gap-2',
+          statusToneClass,
+        ]"
       >
-        {{ t.allowedByMsg(allowMatch) }}
+        <div class="flex-1 min-w-0">
+          <div class="text-sm font-semibold leading-snug">{{ statusTitle }}</div>
+          <div class="text-xs leading-relaxed opacity-80 mt-0.5">
+            {{ statusDetail }}
+          </div>
+        </div>
+        <button
+          v-if="canReveal"
+          type="button"
+          class="shrink-0 px-2.5 py-1 text-xs rounded-md border border-current bg-white dark:bg-gray-900 hover:opacity-80 transition-opacity"
+          @click="handleToggleReveal"
+        >
+          {{ revealedOnPage ? t.restoreBtn : t.revealBtn }}
+        </button>
+      </div>
+
+      <!-- 分頁：方式（怎麼擋）／關鍵字（擋什麼）／區塊（擋哪裡） -->
+      <div
+        v-if="!props.wide"
+        class="flex mb-4 border-b border-gray-200 dark:border-gray-700"
+      >
+        <button
+          v-for="tab in tabDefs"
+          :key="tab.id"
+          type="button"
+          :class="[
+            'flex-1 px-1 py-2 text-sm -mb-px border-b-2 transition-colors',
+            activeTab === tab.id
+              ? 'text-primary-600 dark:text-primary-400 font-semibold border-primary-600 dark:border-primary-400'
+              : 'text-gray-500 dark:text-gray-400 border-transparent hover:text-gray-700 dark:hover:text-gray-200',
+          ]"
+          @click="activeTab = tab.id"
+        >
+          {{ tab.label }}
+        </button>
       </div>
 
       <!--
@@ -793,59 +993,8 @@ function cancelImport() {
         另外包欄容器 —— 少一層 DOM，也不會出現「popup 與設定頁結構不同」的分叉。
       -->
       <div :class="props.wide ? 'grid lg:grid-cols-2 gap-x-8 items-start' : ''">
-      <!-- 全域開關 -->
-      <section
-        class="mb-6 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
-      >
-        <label class="flex items-center justify-between cursor-pointer">
-          <div>
-            <div class="text-sm font-medium">{{ t.globalBlock }}</div>
-            <div class="text-xs text-gray-500 dark:text-gray-400">
-              {{ t.globalBlockDesc }}
-            </div>
-          </div>
-          <input
-            v-model="settings.globalBlock"
-            type="checkbox"
-            class="w-4 h-4 accent-primary-600"
-          />
-        </label>
-
-        <div class="my-2.5 border-t border-gray-200 dark:border-gray-700" />
-
-        <label class="flex items-center justify-between cursor-pointer">
-          <div>
-            <div class="text-sm font-medium">{{ t.perResultBlock }}</div>
-            <div class="text-xs text-gray-500 dark:text-gray-400">
-              {{ t.perResultBlockDesc }}
-            </div>
-          </div>
-          <input
-            v-model="settings.perResultBlock"
-            type="checkbox"
-            class="w-4 h-4 accent-primary-600"
-          />
-        </label>
-
-        <div class="my-2.5 border-t border-gray-200 dark:border-gray-700" />
-
-        <label class="flex items-center justify-between cursor-pointer">
-          <div>
-            <div class="text-sm font-medium">{{ t.pageIndicator }}</div>
-            <div class="text-xs text-gray-500 dark:text-gray-400">
-              {{ t.pageIndicatorDesc }}
-            </div>
-          </div>
-          <input
-            v-model="settings.pageIndicator"
-            type="checkbox"
-            class="w-4 h-4 accent-primary-600"
-          />
-        </label>
-      </section>
-
       <!-- 遮蔽方式 -->
-      <section class="mb-6">
+      <section v-if="showTab('mode')" class="mb-6">
         <h2
           class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2"
         >
@@ -879,95 +1028,94 @@ function cancelImport() {
         </div>
       </section>
 
-      <!-- 區塊類型 -->
-      <section class="mb-6">
-        <h2
-          class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2"
-        >
-          {{ t.blockTypesTitle }}
-        </h2>
-        <div class="space-y-1.5">
-          <label
-            class="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1.5 rounded"
-          >
-            <input
-              v-model="settings.blockTypes.thumbnails"
-              type="checkbox"
-              class="accent-primary-600"
-            />
-            {{ t.blockThumbnails }}
-          </label>
-          <label
-            class="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1.5 rounded"
-          >
-            <input
-              v-model="settings.blockTypes.searchPreview"
-              type="checkbox"
-              class="accent-primary-600"
-            />
-            {{ t.blockSearchPreview }}
-          </label>
-          <label
-            class="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1.5 rounded"
-          >
-            <input
-              v-model="settings.blockTypes.imageFilterBar"
-              type="checkbox"
-              class="accent-primary-600"
-            />
-            {{ t.blockImageFilterBar }}
-          </label>
-          <label
-            class="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1.5 rounded"
-          >
-            <input
-              v-model="settings.blockTypes.images"
-              type="checkbox"
-              class="accent-primary-600"
-            />
-            {{ t.blockImages }}
-          </label>
-          <label
-            class="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1.5 rounded"
-          >
-            <input
-              v-model="settings.blockTypes.videos"
-              type="checkbox"
-              class="accent-primary-600"
-            />
-            {{ t.blockVideos }}
-          </label>
-          <label
-            class="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1.5 rounded"
-          >
-            <input
-              v-model="settings.blockTypes.relatedQuestions"
-              type="checkbox"
-              class="accent-primary-600"
-            />
-            {{ t.blockRelatedQuestions }}
-          </label>
-          <label
-            class="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1.5 rounded"
-          >
-            <input
-              v-model="settings.blockTypes.knowledgePanel"
-              type="checkbox"
-              class="accent-primary-600"
-            />
-            {{ t.blockKnowledgePanel }}
-          </label>
-        </div>
-      </section>
-      <div
-        v-if="saveError"
-        class="mt-3 px-3 py-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md text-xs text-red-600 dark:text-red-400 mb-3"
+      <!-- 全域開關 -->
+      <section
+        v-if="showTab('mode')"
+        class="mb-6 p-3 rounded-lg bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700"
       >
-        {{ t.saveError }}
-      </div>
+        <label class="flex items-center justify-between gap-3 cursor-pointer">
+          <div class="min-w-0">
+            <div class="text-sm font-medium">{{ t.globalBlock }}</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400">
+              {{ t.globalBlockDesc }}
+            </div>
+          </div>
+          <input
+            v-model="settings.globalBlock"
+            type="checkbox"
+            class="w-4 h-4 shrink-0 accent-primary-600"
+          />
+        </label>
+
+        <div class="my-2.5 border-t border-gray-200 dark:border-gray-700" />
+
+        <label class="flex items-center justify-between gap-3 cursor-pointer">
+          <div class="min-w-0">
+            <div class="text-sm font-medium">{{ t.perResultBlock }}</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400">
+              {{ t.perResultBlockDesc }}
+            </div>
+          </div>
+          <input
+            v-model="settings.perResultBlock"
+            type="checkbox"
+            class="w-4 h-4 shrink-0 accent-primary-600"
+          />
+        </label>
+
+        <div class="my-2.5 border-t border-gray-200 dark:border-gray-700" />
+
+        <label class="flex items-center justify-between gap-3 cursor-pointer">
+          <div class="min-w-0">
+            <div class="text-sm font-medium">{{ t.pageIndicator }}</div>
+            <div class="text-xs text-gray-500 dark:text-gray-400">
+              {{ t.pageIndicatorDesc }}
+            </div>
+          </div>
+          <input
+            v-model="settings.pageIndicator"
+            type="checkbox"
+            class="w-4 h-4 shrink-0 accent-primary-600"
+          />
+        </label>
+      </section>
+
+      <!--
+        要隱藏的區塊分兩組：夾帶圖片的，與會連文字一起隱藏的整塊區域。
+        後兩項性質不同（預設關閉、會擋掉文字），並排成一列看不出差別。
+      -->
+      <template v-if="showTab('blocks')">
+        <section v-for="group in blockGroups" :key="group.title" class="mb-6">
+          <h2
+            class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2"
+          >
+            {{ group.title }}
+          </h2>
+          <p
+            v-if="group.hint"
+            class="text-xs text-gray-500 dark:text-gray-400 mb-2 leading-relaxed"
+          >
+            {{ group.hint }}
+          </p>
+          <div class="space-y-1.5">
+            <label
+              v-for="item in group.items"
+              :key="item.key"
+              class="flex items-center gap-2 text-sm cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800 p-1.5 rounded"
+            >
+              <input
+                v-model="settings.blockTypes[item.key]"
+                type="checkbox"
+                class="shrink-0 accent-primary-600"
+              />
+              {{ item.label }}
+            </label>
+          </div>
+        </section>
+      </template>
 
       <!-- 觸發分類 -->
-      <section class="mb-6">
+      <section v-if="showTab('keywords')" class="mb-6">
         <div class="flex items-center justify-between mb-2">
           <h2
             class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide"
@@ -1073,7 +1221,7 @@ function cancelImport() {
                   v-model="settings.enabledCategories"
                   :value="cat.id"
                   type="checkbox"
-                  class="mt-0.5 accent-primary-600"
+                  class="mt-0.5 shrink-0 accent-primary-600"
                 />
                 <div class="flex-1 min-w-0">
                   <div class="font-medium truncate">{{ cat.label }}</div>
@@ -1167,7 +1315,7 @@ function cancelImport() {
         bulk
         class="mb-6"
       />
-      <section v-else class="mb-6">
+      <section v-else-if="showTab('keywords')" class="mb-6">
         <h2
           class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-2"
         >
@@ -1201,6 +1349,7 @@ function cancelImport() {
 
       <!-- 自訂關鍵字 -->
       <KeywordSection
+        v-if="showTab('keywords')"
         :title="t.customKeywordsTitle"
         :keywords="settings.keywords"
         :placeholder="t.keywordPlaceholder"
@@ -1247,53 +1396,53 @@ function cancelImport() {
           {{ t.shortcutsCustomize }}
         </button>
       </section>
-      </div>
-
-      <footer
-        class="mt-6 pt-3 border-t border-gray-200 dark:border-gray-800 text-xs text-gray-400 dark:text-gray-500"
+      <!--
+        儲存配額量的就是這幾份關鍵字清單，放在它們旁邊才有意義；
+        擺在 footer 只是個跟上下文無關的讀數。
+      -->
+      <div
+        v-if="showTab('keywords') && storageBytes > 0"
+        class="mb-6 text-xs text-gray-400 dark:text-gray-500"
       >
-        <!-- 儲存配額進度條 -->
-        <div v-if="storageBytes > 0" class="mb-2">
-          <div class="flex justify-between mb-1">
-            <span>{{ t.storageLabel }}</span>
-            <span
-              :class="
-                storagePercent >= 90
-                  ? 'text-red-500'
-                  : storagePercent >= 70
-                    ? 'text-amber-500'
-                    : ''
-              "
-              >{{ storageKB }} / 100 KB</span
-            >
-          </div>
-          <div
-            class="h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden"
+        <div class="flex justify-between mb-1">
+          <span>{{ t.storageLabel }}</span>
+          <span
+            :class="
+              storagePercent >= 90
+                ? 'text-red-500'
+                : storagePercent >= 70
+                  ? 'text-amber-500'
+                  : ''
+            "
+            >{{ storageKB }} / 100 KB</span
           >
-            <div
-              :class="[
-                storageBarColor,
-                'h-full rounded-full transition-all duration-500',
-              ]"
-              :style="{ width: storagePercent + '%' }"
-            />
-          </div>
         </div>
         <div
-          class="text-center"
-          :class="{
-            'mt-4 pt-3 border-t border-gray-200 dark:border-gray-800':
-              storageBytes > 0,
-          }"
+          class="h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden"
         >
-          <a
-            href="/privacy.html"
-            target="_blank"
-            rel="noopener"
-            class="hover:text-gray-600 dark:hover:text-gray-300 underline underline-offset-2"
-            >{{ t.privacyPolicy }}</a
-          >
+          <div
+            :class="[
+              storageBarColor,
+              'h-full rounded-full transition-all duration-500',
+            ]"
+            :style="{ width: storagePercent + '%' }"
+          />
         </div>
+      </div>
+
+      </div>
+
+      <!-- 隱私權政策常駐 —— 不分頁、不隨狀態消失 -->
+      <footer
+        class="mt-6 pt-3 border-t border-gray-200 dark:border-gray-800 text-xs text-gray-400 dark:text-gray-500 text-center"
+      >
+        <a
+          href="/privacy.html"
+          target="_blank"
+          rel="noopener"
+          class="hover:text-gray-600 dark:hover:text-gray-300 underline underline-offset-2"
+          >{{ t.privacyPolicy }}</a
+        >
       </footer>
     </template>
 

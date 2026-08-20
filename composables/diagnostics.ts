@@ -27,6 +27,14 @@ export interface DiagnosisReport {
   cssMatches: number;
   /** 逐筆比對目前隱藏的圖片數 */
   scannerMatches: number;
+  /**
+   * 造成逐筆隱藏的第一個命中。
+   *
+   * query 沒命中、但結果內文命中的情況下，popup 只靠 `findBlockMatch(query)`
+   * 是算不出原因的 —— 那個判斷發生在 content script 裡，看的是每一筆結果的
+   * 文字與圖片說明。不帶回來的話 popup 只能說「有擋到東西」卻講不出為什麼。
+   */
+  scannerMatch: { keyword: string; categoryLabel: string | null } | null;
   /** 使用者是否已在本頁按下「顯示」 */
   revealed: boolean;
 }
@@ -59,4 +67,48 @@ export function summarizeDiagnosis(
     return report.cssMatches > 0 ? "ok" : "broken";
   }
   return report.scannerMatches > 0 ? "ok" : "idle";
+}
+
+/** popup 狀態卡要顯示哪一種狀態 */
+export type PageStatus =
+  /** 目前分頁不是我們注入的 Google 搜尋頁 */
+  | "offsite"
+  /** 這一頁有東西被擋住 */
+  | "blocked"
+  /** 命中例外清單而被放行 */
+  | "allowed"
+  /** 沒事發生 —— 不是壞掉，只是這一頁沒有該擋的東西 */
+  | "idle";
+
+/** 報告裡「實際隱藏了幾個」的單一定義 */
+export function hiddenCountOf(report: DiagnosisReport | null): number | null {
+  if (!report) return null;
+  return report.queryBlocked ? report.cssMatches : report.scannerMatches;
+}
+
+/**
+ * 判斷這一頁的狀態。
+ *
+ * **content script 的回報優先於 query 比對** —— 這是這支函式存在的唯一理由。
+ * 逐筆結果比對跑在頁面裡：搜「像是蛛」時 query 一個關鍵字都不命中，但結果
+ * 內文全是蜘蛛，掃描器照樣擋掉幾十張圖。只看 query 比對的話 popup 會說
+ * 「這一頁沒有被阻擋」，而頁面左下角的提示同時寫著「已隱藏 52 個區塊」。
+ *
+ * 問不到 content script（非搜尋頁、分頁在安裝前就開著、截圖模式）時才退回
+ * query 比對 —— 那是唯一還算得出來的依據。
+ *
+ * 刻意收 boolean 而不是 settings + query：這個檔案不 import 任何東西，
+ * 那個性質要保住（content script、popup、background、測試都會載入它）。
+ */
+export function summarizePageStatus(input: {
+  onSearchPage: boolean;
+  report: DiagnosisReport | null;
+  queryBlocked: boolean;
+  queryAllowed: boolean;
+}): PageStatus {
+  if (!input.onSearchPage) return "offsite";
+  if ((hiddenCountOf(input.report) ?? 0) > 0) return "blocked";
+  if (input.queryBlocked) return "blocked";
+  if (input.queryAllowed) return "allowed";
+  return "idle";
 }
