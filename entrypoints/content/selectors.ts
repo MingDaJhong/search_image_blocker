@@ -57,13 +57,18 @@ export const INITIAL_HIDE_BLOCK_TYPES: BlocklistSettings["blockTypes"] = {
  *   [jscontroller="rTuANe"]  — 知識面板影片 + 主搜尋結果區影片區「都」用這個 controller
  *   [data-attrid*="Video"]   — 知識面板的 VisualDigestVideoResult / 舊版 VideoObject
  *   video-voyager / [data-vido] — 舊版 layout 的 fallback
+ *
+ * `div[jsname="tX7jT"]` 曾在這裡，2026-08-21 的週檢抓到它歸零後移除：真頁面
+ * （`q=貓`）上那個容器一個都不存在，但同一頁的影片區塊還在，而且已經被上面
+ * 前兩條命中（rTuANe 10 張圖、data-attrid 5 張）。也就是 Google 換掉了容器名、
+ * 被擋的東西沒變少 —— 留著只會讓每週週檢固定亮一盞紅燈。要補回來之前，先用
+ * canary 確認它真的還會命中。
  */
 const VIDEO_CARD_CONTAINERS = [
   '[jscontroller="rTuANe"]',
   'div[data-attrid*="Video"]',
   "video-voyager",
   "div[data-vido]",
-  'div[jsname="tX7jT"]',
 ];
 
 /**
