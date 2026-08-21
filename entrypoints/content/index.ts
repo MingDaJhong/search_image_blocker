@@ -23,6 +23,7 @@ import { revealOnClick, type ClickRevealer } from "./clickReveal";
 import { createIndicator, type Indicator } from "./indicator";
 import { scanResults, type ResultScanner } from "./resultScanner";
 import { readSearchQuery, watchSearchQuery } from "./softNav";
+import { watchBlockedCount, type BlockCountWatcher } from "./blockCount";
 
 const BLOCK_STYLE_ID = "sib-block-style";
 const INITIAL_STYLE_ID = "sib-initial-hide";
@@ -63,6 +64,8 @@ export default defineContentScript({
     /** resultScanner 是用哪一種遮蔽方式建的；使用者換模式時要重建才吃得到 */
     let scannerMode = settings.hideMode;
     let clickRevealer: ClickRevealer | null = null;
+    /** 只在頁面 CSS 阻擋生效時存在：讓提示的數字跟得上延遲載入的縮圖 */
+    let countWatcher: BlockCountWatcher | null = null;
     /**
      * 頁面層級封鎖 CSS 目前是不是掛著的。
      *
@@ -95,6 +98,11 @@ export default defineContentScript({
       // disconnect() 自己會還原隱藏掉的圖片
       resultScanner?.disconnect();
       resultScanner = null;
+    }
+
+    function stopCountWatcher() {
+      countWatcher?.disconnect();
+      countWatcher = null;
     }
 
     function stopClickRevealer() {
@@ -177,6 +185,7 @@ export default defineContentScript({
         stopAutocompleteWatcher();
         stopResultScanner();
         stopClickRevealer();
+        stopCountWatcher();
         removeIndicator();
         return;
       }
@@ -223,6 +232,15 @@ export default defineContentScript({
         stopAutocompleteWatcher();
       }
 
+      // 提示的數字要跟得上捲動才載入的縮圖。只在頁面 CSS 真的在擋、而且提示
+      // 開著的時候掛 —— 逐筆掃描那條路徑由 scanner 自己的 debounce 回呼，
+      // 兩者不會同時存在（query 命中就不跑掃描）。
+      if (pageBlocked && s.pageIndicator && document.body) {
+        countWatcher ??= watchBlockedCount(() => refreshIndicator(settings));
+      } else {
+        stopCountWatcher();
+      }
+
       refreshIndicator(s);
     }
 
@@ -232,11 +250,10 @@ export default defineContentScript({
       // 重跑一次：逐筆掃描與頁面提示都需要 body 存在，
       // 第一次 applyState 時（document_start 之後幾毫秒）還沒有
       applyState(settings);
-      // Google 的縮圖是延遲載入的，隔一段時間再數一次才數得準。
-      // 只補兩次而不是掛 MutationObserver —— 這只是個資訊性標籤，
-      // 不值得為了它在每一次 DOM 變動上付出成本。
-      setTimeout(() => refreshIndicator(settings), 1000);
-      setTimeout(() => refreshIndicator(settings), 3000);
+      // 縮圖的延遲載入改由 blockCount.ts 的 observer 追（頁面 CSS 這條）
+      // 與 resultScanner 自己的 debounce 回呼（逐筆這條）涵蓋。原本這裡補的
+      // 兩次 setTimeout(1s / 3s) 追不上「捲到才載」—— 兩次都發生在使用者
+      // 開始捲之前。
 
       if (import.meta.env.DEV) {
         setTimeout(() => devSelectorAudit(query, settings), 2000);
@@ -251,8 +268,6 @@ export default defineContentScript({
       stopResultScanner();
       stopClickRevealer();
       applyState(settings);
-      // 新結果是非同步串流進來的，跟首次載入一樣要補數
-      setTimeout(() => refreshIndicator(settings), 1000);
     });
 
     browser.storage.onChanged.addListener((changes, area) => {

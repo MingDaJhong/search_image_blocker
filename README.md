@@ -26,7 +26,13 @@ pnpm test:watch   # 開發時 watch 模式
 
 # 更新隱私權政策後同步根目錄那份（GitHub Pages 服務的來源）
 pnpm sync:privacy
+
+# Selector 週檢（每週手動跑，開真 Chrome 打 Google，比對命中數基準線）
+pnpm canary          # 唯讀：印報告，真的失效就 exit 1
+pnpm canary:update   # 看過報告確認正常後，把這次觀測併進基準線
 ```
+
+`pnpm canary` **不在 `pnpm test` 裡，也永遠不要放進 CI** —— 見下方「Selector 週檢」。
 
 ## 專案結構
 
@@ -42,8 +48,9 @@ pnpm sync:privacy
 │   │   ├── softNav.ts     # 軟導航後追蹤 q 的變化（切 udm 分頁 / 篩選 chip）
 │   │   ├── indicator.ts   # 頁面左下角封鎖提示（closed shadow DOM）
 │   │   ├── resultScanner.ts  # 逐筆結果比對（不依賴任何 Google 屬性）
+│   │   ├── blockCount.ts  # 讓提示的數字跟得上「捲到才載」的縮圖（MutationObserver + debounce）
 │   │   ├── messages.ts    # content script 專用文案（不共用 popup 的 i18n，避免打包整包）
-│   │   └── *.test.ts      # selectors / hideStyle / clickReveal / softNav / indicator / resultScanner
+│   │   └── *.test.ts      # selectors / hideStyle / clickReveal / softNav / indicator / resultScanner / blockCount
 │   ├── options/           # 獨立設定頁：掛同一個 App.vue，只是 wide=true
 │   │   ├── index.html     # meta manifest.open_in_tab → 開在自己的分頁而不是 iframe
 │   │   └── main.ts
@@ -53,7 +60,7 @@ pnpm sync:privacy
 │       ├── KeywordSection.vue # 共用的「標題 + 輸入框 + chip 清單」（3 個呼叫點，可選篩選 / 批次貼上）
 │       ├── i18n.ts            # 多語系 messages
 │       ├── main.ts            # 首次渲染前同步套用 dark class（防閃爍）
-│       ├── style.css          # 360px 掛在 body.sib-popup 上，設定頁才不會被夾住
+│       ├── style.css          # 360px 掛在 html.sib-popup + body 上（Chrome 量的是 documentElement），設定頁不掛所以不受影響
 │       └── index.html
 ├── composables/
 │   ├── blockList.ts       # 純資料層（無 Vue）：型別、storage I/O、matchKeyword / shouldBlock — content + popup 都用
@@ -63,10 +70,19 @@ pnpm sync:privacy
 │   ├── googleTlds.test.ts # isGoogleSearchUrl + content script matches 一致性
 │   ├── repoConsistency.test.ts # 版本號 / privacy.html 副本 / i18n 鍵的漂移守門
 │   └── useBlockList.ts    # popup-only：Vue composable + mutators + parseImport / mergeSettings + PRESET_TEMPLATES
+├── canary/                # Selector 週檢：開真 Chrome 走 6 個 Google 頁面，逐格比對命中數
+│   ├── pages.ts           # 頁面矩陣（純資料）：每條還活著的 selector 至少被一頁涵蓋
+│   ├── report.ts          # 判定與報表（純函式，由 pnpm test 一起守住）
+│   ├── report.test.ts
+│   ├── probe.ts           # 序列化後丟進頁面執行的計數函式（不能引用外部變數）
+│   ├── run.canary.ts      # Playwright 驅動（由 vitest.canary.config.ts 執行）
+│   ├── baseline.json      # 觀測史 { max, seen, runs }，不是「上次幾個」
+│   └── README.md          # 操作手冊：報告怎麼讀、六種狀態、出現紅燈的修復流程
 ├── public/icon/           # Extension 圖示 PNG（16/32/48/96/128 px，會被打包進 .crx）
 ├── assets/icons-source/   # SVG 來源 + build.py（不在版控、不打包；本機備份保留）
 ├── wxt.config.ts          # WXT 設定檔（manifest 在這）
 ├── vitest.config.ts       # 測試設定（WxtVitest 提供 @/ alias 與 browser mock）
+├── vitest.canary.config.ts # 週檢專用（headed、逾時放寬、不攔 console —— 報告就是它的產出）
 ├── tailwind.config.js
 └── postcss.config.js
 ```
@@ -78,7 +94,7 @@ pnpm sync:privacy
 3. 點擊瀏覽器右上角 extension 圖示開啟 popup 設定關鍵字
 4. 改任何設定都會立刻反映在已開啟的搜尋頁，不需要重新整理
 
-發布前的完整走查路徑見下方「1.1.0 發布前必做」。
+發布前的走查結果與剩下的項目見下方「1.1.0 發布前檢查」。
 
 ## 功能說明
 
@@ -102,7 +118,7 @@ pnpm sync:privacy
 - **逐筆結果比對**：搜尋字沒命中任何關鍵字時，改逐筆判斷每一張圖，只隱藏命中那一張。補的是 query 層級阻擋的盲點 —— 搜「我家牆上這是什麼」時 query 一個關鍵字都不會命中，但結果標題全是「蜘蛛」，那正是最需要保護的時刻。兩個訊號：**圖片自己的 alt / title / aria-label**（含外層連結的），以及**從圖片往上走找到的所屬結果文字**。兩者都**不依賴任何 Google class / jsname**，天生抗 DOM 改版
 - **圖片分頁覆蓋**：alt 比對特別重要 —— 圖片分頁（`udm=2`）的圖磚周圍幾乎沒有文字，但 alt 通常是來源頁標題，而那正是這個產品最關鍵的頁面
 - **主畫面分三頁**：`方式`（怎麼擋）／`關鍵字`（擋什麼）／`區塊`（擋哪裡）。狀態卡固定在分頁列上方常駐 —— 它是頁面層級的讀數不是設定，三頁都看得到「這一頁怎麼了」，四種狀態：阻擋中 / 已顯示 / 沒被阻擋 / 不在搜尋頁。隱藏數量與命中原因**向 content script 取得**，因為逐筆結果比對是在頁面裡跑的，popup 光看搜尋字算不出來；問不到時只顯示狀態不顯示數字（`0` 的意思是「檢查過、一個都沒擋到」，跟「問不到」不能混為一談）。卡片上的「本頁顯示」與快捷鍵、頁面提示走同一個訊息。隱私權政策常駐於 footer。獨立設定頁不分頁，一次攤開全部（同一份 App.vue，靠 `wide` 切換）
-- **頁面提示**：搜尋頁左下角顯示「已隱藏 N 個區塊 · 關鍵字「蛇」」，一鍵「顯示」可在本頁放開圖片（只影響這次載入、不改設定、不寫任何儲存，重新整理即恢復）。若阻擋啟用卻數到 0 個區塊，提示會直接說「沒有找到可隱藏的區塊」—— 在沒有任何遙測的前提下，這是使用者能發現 Google 改版的唯一管道。可於 popup 關閉
+- **頁面提示**：搜尋頁左下角顯示「已隱藏 N 個區塊 · 關鍵字「蛇」」，一鍵「顯示」可在本頁放開圖片（只影響這次載入、不改設定、不寫任何儲存，重新整理即恢復）。若阻擋啟用卻數到 0 個區塊，提示會直接說「沒有找到可隱藏的區塊」—— 在沒有任何遙測的前提下，這是使用者能發現 Google 改版的唯一管道。數字會跟著捲動補上來的縮圖一起更新（Google 的縮圖是捲到才載，原本用兩個固定時間點補數，兩次都發生在使用者開始捲之前）。可於 popup 關閉
 - **遮蔽方式（hide / blur / mask）**：`hide` 整塊移除（版面收起、圖片不下載，1.0.x 的行為，也是預設值）；`blur` 保留版面但看不出形狀；`mask` 蓋成純色方塊，連輪廓都不露。blur 與 mask 可以在搜尋頁**點一下被遮住的圖，只顯示那一張**（刻意是點擊而不是 hover —— 對這個族群「滑過去就露出來」比看不到更糟）。`<video>` 在三種模式下一律直接隱藏，否則它會留在版面上、hover 會播、還會出聲
 - **鍵盤快捷鍵**：`Alt+Shift+B` 開設定面板、`Alt+Shift+S` 切換本頁顯示 / 復原（可在 `chrome://extensions/shortcuts` 改）。設定頁會列出目前實際的鍵位（讀 `commands.getAll()`，不是寫死 manifest 的建議值）
 - **獨立設定頁**：popup 選單「開啟完整設定」。掛的是同一個 `App.vue`，只是把 `wide` 打開 —— 兩欄版面、例外關鍵字直接攤開、關鍵字篩選、批次貼上（換行 / 逗號 / 頓號 / 分號都吃）
@@ -122,17 +138,70 @@ pnpm sync:privacy
 
 已完成的功能請看上面的「功能說明」，這裡只記還沒做完、刻意不做、以及發布前一定要做的事。
 
-## 1.1.0 發布前必做
+## 1.1.0 發布前檢查
 
-**全部都是「只在合成 DOM 或單機截圖驗過」的東西 —— 這是目前唯一擋在發布前的關卡。**
+2026-08-21 用 production build（`.output/chrome-mv3`，載入未封裝項目）在真實 Google 上走過一輪。
 
-- [ ] **真實 Google SERP 走一輪**。一條路徑幾乎全覆蓋：
-  `pnpm dev` → 搜「蝴蝶」（query 命中）→ 切到圖片分頁（驗軟導航 A6）→ 換成 mask 模式 → 點一張圖（驗點擊揭露）→ 按 `Alt+Shift+S`（驗快捷鍵）→ 搜「像是蛛」（query 不命中但結果命中，驗逐筆比對與 popup／頁面提示的狀態同步）→ 開設定頁 → 按診斷
-- [ ] **逐筆比對會不會過度隱藏或完全沒作用**。`MAX_CONTEXT_CHARS`（400）與 `MAX_WALK_UP`（8）是憑合成 DOM 訂的，真實結果容器的文字量可能差很多。兩個都是可調的旋鈕；真的不行也可以把 `perResultBlock` 預設改成關閉（一行）
-- [ ] **點擊揭露會不會誤攔 Google 的正常點擊**。用了 `stopImmediatePropagation`，這是風險最高的一項
-- [ ] **圖片分頁（`udm=2`）的實際覆蓋**。那是這個產品最關鍵的頁面，而它的容器結構我沒有實測過
-- [ ] **blur / mask 的實際觀感**，以及 popup 三個分頁、狀態卡四種狀態的版面
+已驗過：
+
+- [x] **軟導航（A6）** —— `pushState` 換掉 `q` 之後 1.6 秒內，29 條頁面規則整批移除；換回命中的字又重新注入。這支模組不是多的
+- [x] **逐筆結果比對** —— 搜「台北天氣」（query 完全不命中、頁面 CSS 沒作用），掃描器仍以 inline `display:none !important` 擋掉 28 張圖，抓到的 alt 全是蜘蛛相關。`MAX_CONTEXT_CHARS` / `MAX_WALK_UP` 沒有過度隱藏也沒有失效
+- [x] **點擊揭露不會誤攔 Google 的點擊** —— 風險最高的那一項。在圖片分頁點一個包在連結裡、祖先有 `jsaction` 的圖磚：只有它解除、其他 205 張仍遮著、網址沒變、**Google 的側邊預覽面板沒被打開**（第一次點擊確實被吞掉）
+- [x] **圖片分頁（`udm=2`）的覆蓋** —— 206 張圖 100% 命中；影片分頁 23 張同樣 100%
+- [x] **blur / mask 的實際觀感** —— blur 量到 `blur(32px) contrast(0.25) brightness(1.2)` 加 `clip-path: inset(0px)` 確實生效，沒有糊到隔壁標題；mask 目視確認
+- [x] **popup 三個分頁與狀態卡** —— 順帶抓到並修掉兩個寬度 bug（見下）
+
+還沒做完：
+
 - [ ] 更新 Chrome Web Store listing 的截圖與版本說明（1.1.0 的畫面與 1.0.2 差很多）
+- [ ] **`<video>` 在三種模式下一律 `display: none`** —— 走過的頁面上根本沒有 `<video>` 元素（週檢基準線也顯示這組 selector 從未命中過），所以那條規則到今天仍是純防禦性程式碼
+- [ ] **popup 的「檢查是否失效」按鈕、獨立設定頁的實際互動** —— 只在本機用 stub 量過設定頁版面（1280 px、內容 1024 px），沒有真的操作過
+- [ ] **提示計數跟上 lazy-load 的修正**（`blockCount.ts`）有單元測試，但還沒在真實 Google 上實測
+- [ ] Firefox 只驗到能 build，沒有實際載入過
+
+### 那兩個寬度 bug
+
+兩個都是 1.1.0 自己引入的，症狀一樣（popup 右邊多一塊空白），成因不同：
+
+1. `7371414` 為了不讓新的獨立設定頁被夾成 360 px，把 `html, body { width: 360px }` 改成只有 `body.sib-popup` —— 但 **Chrome 決定 popup 開多寬時量的是 `documentElement`**，於是 html 撐到 popup 的 800 px 上限
+2. 夾住 html 之後還多 17 px，那是捲軸：popup 高度上限 600 px，內容一超過就捲，而**根元素的 overflow 會往上傳播成 viewport 捲軸**。在 html 上設一個非 visible 的 overflow 才能切斷傳播，讓 body 自己消化
+
+`repoConsistency.test.ts` 有三條測試釘住這兩件事，以及「設定頁不能掛上那個 class」。
+
+## Selector 週檢（`canary/`）
+
+`selectors.ts` 是整個專案唯一會因為**別人改東西**而壞掉的檔案，而這個產品沒有遙測 ——
+Google 改了 DOM 沒有任何自動訊號。`canary/` 就是那個訊號：每週手動跑一次，開真的
+Chrome 走過 6 個 Google 頁面，逐條數 selector 命中數，和 `canary/baseline.json` 比對。
+
+```bash
+pnpm canary          # 1. 看報告
+# 2. 沒有 🔴 →
+pnpm canary:update   # 3. 告訴它「這次正常」
+```
+
+一次約 40 秒。詳細操作、報告怎麼讀、出現紅燈的修復流程見 `canary/README.md`。
+
+幾個不明顯但 load-bearing 的設計：
+
+- **為什麼要真瀏覽器**：排除清單建立在 `:not(:is(cite img, …))` 上，happy-dom 不支援
+  後代組合子而且是靜默失敗。任何在 happy-dom 裡做的命中數斷言測到的是 happy-dom，
+  不是這個產品
+- **為什麼不能上 CI**：GitHub Actions 是資料中心 IP，Google 幾乎必定回驗證碼。搬上 CI
+  不會得到自動化報告，只會得到一份每週都是 ⏭ 略過的報告
+- **為什麼比基準線而不是 `expect(count > 0)`**：首次盤點顯示 33 條裡有 23 條在 6 個真實
+  頁面上一次都沒命中過。硬門檻會讓每次執行都亮 23 個紅燈，兩週後就沒人看了。真正有
+  訊息量的是**變化**
+- **為什麼「歸零」本身還不足以判定失效**：Google 不保證同一個查詢每次都顯示同一組模組，
+  知識面板的影片區、圖片輪播隔十五分鐘就會不一樣。所以基準線每一格記的是**觀測史**
+  `{ max, seen, runs }`，夠可信的一格歸零才報紅燈，否則只報 🟠
+- **只有 `canary:update` 會累積觀測史**。如果每次執行都自動累積，一個真的壞掉的 selector
+  會因為連續幾週都是 0 而讓穩定度一路降到門檻以下，然後自己變成 `dead` 不再報警 ——
+  那正是「靜默把機制關掉」的失敗模式
+
+第一次跑就抓到一條：`div[jsname="tX7jT"]`（影片卡容器）從 3/3 命中掉到 0。另開真頁面
+查證 `q=貓`：那個容器一個都不存在，但同一頁的影片區塊還在，且已被 `[jscontroller="rTuANe"]`
+與 `div[data-attrid*="Video"]` 接住 —— Google 換掉的是容器名，被擋的東西沒變少。已移除該條。
 
 ## 已評估後決定不做
 
@@ -158,9 +227,9 @@ pnpm sync:privacy
 
 - **點擊揭露沒有鍵盤路徑**：blur / mask 模式下，「點一下顯示這一張」只綁滑鼠點擊。被遮的 `<img>` 本身不可聚焦，要讓它可聚焦就得在 Google 的搜尋結果裡插入額外 tab stop，那對所有鍵盤使用者都是成本。目前的替代路徑是快捷鍵 `Alt+Shift+S`（放開整頁）與頁面提示上的「顯示」按鈕 —— 不是死路，但單張揭露確實只有滑鼠能做
 
-- Google CSS 選擇器會隨 Google DOM 改版而失效，需持續觀察並更新 `entrypoints/content/selectors.ts` 中的 selector
-- **`blur` / `mask` 只在合成 fixture 上用真實 CSS 引擎驗過，沒有對真實 Google SERP 跑過**。視覺主張成立（去背 PNG 不留剪影、模糊不溢出），但在實際結果頁上的觀感、以及點擊揭露會不會被 Google 的 `jsaction` 干擾，仍未驗證。`hideStyle.ts` 裡三個常數都是可調的旋鈕
-- **A6 的軟導航也還沒對真實 Google 驗過**：udm 分頁 / 篩選 chip 是否真的走 pushState 依 Google 版本而異。500 ms 輪詢讓兩種情況都正確，但若軟導航根本不發生，這支模組就是多的
+- Google CSS 選擇器會隨 Google DOM 改版而失效，需持續觀察並更新 `entrypoints/content/selectors.ts` 中的 selector。**部分失效**（一條死掉、其他還活著）現在由 `pnpm canary` 逐格比對涵蓋 —— 但那是每週手動跑的，真的壞掉到你發現之間仍有最多一週的空窗
+- **週檢只涵蓋 `DEFAULT_SETTINGS.blockTypes`（33 條）**。`relatedQuestions` / `knowledgePanel` 那 7 條預設關閉、沒有基準線，壞了不會有人知道
+- **`<video>` 那條規則沒有任何實測**。三種模式下一律 `display: none` 的邏輯有單元測試，但真實頁面上從來沒出現過 `<video>` 元素（週檢基準線也是 0 命中），所以它到今天仍是純防禦性程式碼
 - `blur` / `mask` 下圖片仍然會下載 —— 那是「保留版面」的必然代價，popup 的說明有講明
 - content script 內無使用者可見字串，i18n 暫不需要；若未來加 toast / banner 再加
 - 切換 popup 語言時，內建分類的 label / keywords 不會跟著切換（首次安裝就 seed 為單一 locale 的 string）— 這是儲存設計選擇，不是 bug
