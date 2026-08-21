@@ -12,10 +12,18 @@ body {
 }
 
 /*
- * 360 px 是 popup 專屬的，掛在 body 的 class 上而不是 html/body 本身 ——
- * 同一份 style.css 也被獨立設定頁載入，寫在 body 上會把設定頁一起夾成 360 px。
+ * 360 px 必須同時夾住 html 和 body。
+ *
+ * Chrome 決定 popup 視窗要開多寬時，量的是 **documentElement**，不是 body。
+ * 只夾 body 的話 html 仍然撐到 popup 的 800 px 上限 —— 內容照樣是 360 px，
+ * 但右邊多出一大片空白。1.1.0 就是這樣出過一次：那次為了不讓獨立設定頁被
+ * 夾成 360 px，把規則從 `html, body` 改成只有 `body.sib-popup`。
+ *
+ * 所以 class 掛在 html/body 上、而不是寫死 `html, body`：同一份 style.css
+ * 也被設定頁載入，寫死會把那一頁一起夾窄。
  */
-body.sib-popup {
+html.sib-popup,
+html.sib-popup body {
   width: 360px;
 }
 

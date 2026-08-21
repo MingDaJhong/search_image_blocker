@@ -95,3 +95,25 @@ describe('快捷鍵描述有雙語', () => {
     }
   })
 })
+
+describe('popup 寬度', () => {
+  it('360 px 同時夾住 html 與 body', () => {
+    // Chrome 決定 popup 視窗開多寬時量的是 documentElement，不是 body。
+    // 1.1.0 曾把規則從 `html, body` 改成只有 `body.sib-popup`（為了不讓獨立
+    // 設定頁被夾窄），結果 popup 的 html 撐到 800 px 上限，內容靠左、右邊一
+    // 大片空白。這條測試釘住「html 那一半不能再掉」。
+    const css = read('entrypoints/popup/style.css')
+    expect(css).toMatch(/html\.sib-popup[\s,][\s\S]*?width:\s*360px/)
+
+    const html = read('entrypoints/popup/index.html')
+    expect(html, 'popup 的 <html> 少了 sib-popup class').toMatch(
+      /<html[^>]*\sclass="[^"]*\bsib-popup\b/,
+    )
+  })
+
+  it('獨立設定頁沒有掛上那個 class', () => {
+    // 掛上去等於把「有空間管理幾百個關鍵字」的那一頁夾回 360 px
+    const options = read('entrypoints/options/index.html')
+    expect(options).not.toMatch(/\bsib-popup\b/)
+  })
+})
