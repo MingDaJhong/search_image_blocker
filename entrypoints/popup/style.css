@@ -27,6 +27,31 @@ html.sib-popup body {
   width: 360px;
 }
 
+/*
+ * 捲軸必須長在那 360 px 之內。
+ *
+ * popup 高度上限是 600 px，內容超過就會捲 —— 但根元素的 overflow 會往上
+ * 傳播成 viewport 捲軸，Chrome 於是把視窗開成 360 + 捲軸寬（macOS 上量到
+ * 約 377 px），右邊一條灰帶。
+ *
+ * 在 html 上設一個非 visible 的 overflow 就會**切斷那個傳播**，body 的
+ * overflow 才會由 body 自己消化。所以是 html: hidden、body: auto，兩者
+ * 缺一不可：只設 body 的話它照樣傳播上去。
+ *
+ * max-height 而不是 height：內容不到 600 px 時 popup 該跟著變矮，寫死
+ * height 會讓「方式」那一頁也開成滿版 600 px。
+ */
+html.sib-popup {
+  max-height: 600px;
+  overflow: hidden;
+}
+
+html.sib-popup body {
+  max-height: 600px;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
 html.dark,
 html.dark body {
   background: #111827; /* gray-900 — 與 popup 內層 dark:bg-gray-900 對齊 */

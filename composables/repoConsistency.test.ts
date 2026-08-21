@@ -111,6 +111,19 @@ describe('popup 寬度', () => {
     )
   })
 
+  it('捲軸長在那 360 px 之內', () => {
+    // 根元素的 overflow 會傳播成 viewport 捲軸，Chrome 就把視窗開成
+    // 360 + 捲軸寬。html 設一個非 visible 的 overflow 才能切斷傳播，
+    // 讓 body 自己消化 —— 兩條缺一不可。
+    const css = read('entrypoints/popup/style.css')
+    expect(css, 'html.sib-popup 少了 overflow: hidden').toMatch(
+      /html\.sib-popup\s*\{[^}]*overflow:\s*hidden/,
+    )
+    expect(css, 'html.sib-popup body 少了 overflow-y: auto').toMatch(
+      /html\.sib-popup body\s*\{[^}]*overflow-y:\s*auto/,
+    )
+  })
+
   it('獨立設定頁沒有掛上那個 class', () => {
     // 掛上去等於把「有空間管理幾百個關鍵字」的那一頁夾回 360 px
     const options = read('entrypoints/options/index.html')
