@@ -1,0 +1,1045 @@
+{
+  "version": 2,
+  "ranAt": "2026-08-21",
+  "runs": 3,
+  "cells": {
+    "tw-web": {
+      "g-scrolling-carousel": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "g-img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-tts-text]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "#search img:not(:is(cite img, .VuuXrf img, .byrV5b img, .TbwUpd img, .XNo5Ab, .eqA2re, video-voyager *, [data-attrid*=\"Video\"] *, [data-vido] *, [jscontroller=\"rTuANe\"] *))": {
+        "max": 18,
+        "seen": 3,
+        "runs": 3
+      },
+      "#rcnt img:not(:is(cite img, .VuuXrf img, .byrV5b img, .TbwUpd img, .XNo5Ab, .eqA2re, video-voyager *, [data-attrid*=\"Video\"] *, [data-vido] *, [jscontroller=\"rTuANe\"] *))": {
+        "max": 34,
+        "seen": 3,
+        "runs": 3
+      },
+      "[jscontroller=\"rTuANe\"] img": {
+        "max": 13,
+        "seen": 3,
+        "runs": 3
+      },
+      "[jscontroller=\"rTuANe\"] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[jscontroller=\"rTuANe\"] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"Video\"] img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"Video\"] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"Video\"] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "video-voyager img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "video-voyager picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "video-voyager [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-vido] img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-vido] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-vido] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[jsname=\"tX7jT\"] img": {
+        "max": 3,
+        "seen": 3,
+        "runs": 3
+      },
+      "div[jsname=\"tX7jT\"] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[jsname=\"tX7jT\"] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "a[href*=\"youtube.com/watch\"] img": {
+        "max": 4,
+        "seen": 3,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] :is(:has(> img):not(:has(> :not(img))))": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] g-img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[jscontroller=\"rTuANe\"] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"Video\"] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "video-voyager video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-vido] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[jsname=\"tX7jT\"] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "a[href*=\"youtube.com/watch\"] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      }
+    },
+    "tw-images": {
+      "g-scrolling-carousel": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"image\"]": {
+        "max": 100,
+        "seen": 3,
+        "runs": 3
+      },
+      "g-img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-tts-text]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "#search img:not(:is(cite img, .VuuXrf img, .byrV5b img, .TbwUpd img, .XNo5Ab, .eqA2re, video-voyager *, [data-attrid*=\"Video\"] *, [data-vido] *, [jscontroller=\"rTuANe\"] *))": {
+        "max": 212,
+        "seen": 3,
+        "runs": 3
+      },
+      "#rcnt img:not(:is(cite img, .VuuXrf img, .byrV5b img, .TbwUpd img, .XNo5Ab, .eqA2re, video-voyager *, [data-attrid*=\"Video\"] *, [data-vido] *, [jscontroller=\"rTuANe\"] *))": {
+        "max": 212,
+        "seen": 3,
+        "runs": 3
+      },
+      "[jscontroller=\"rTuANe\"] img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[jscontroller=\"rTuANe\"] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[jscontroller=\"rTuANe\"] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"Video\"] img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"Video\"] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"Video\"] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "video-voyager img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "video-voyager picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "video-voyager [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-vido] img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-vido] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-vido] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[jsname=\"tX7jT\"] img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[jsname=\"tX7jT\"] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[jsname=\"tX7jT\"] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "a[href*=\"youtube.com/watch\"] img": {
+        "max": 1,
+        "seen": 3,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] :is(:has(> img):not(:has(> :not(img))))": {
+        "max": 33,
+        "seen": 3,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] img": {
+        "max": 33,
+        "seen": 3,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] g-img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[jscontroller=\"rTuANe\"] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"Video\"] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "video-voyager video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-vido] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[jsname=\"tX7jT\"] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "a[href*=\"youtube.com/watch\"] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      }
+    },
+    "tw-video": {
+      "g-scrolling-carousel": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "g-img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-tts-text]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "#search img:not(:is(cite img, .VuuXrf img, .byrV5b img, .TbwUpd img, .XNo5Ab, .eqA2re, video-voyager *, [data-attrid*=\"Video\"] *, [data-vido] *, [jscontroller=\"rTuANe\"] *))": {
+        "max": 2,
+        "seen": 3,
+        "runs": 3
+      },
+      "#rcnt img:not(:is(cite img, .VuuXrf img, .byrV5b img, .TbwUpd img, .XNo5Ab, .eqA2re, video-voyager *, [data-attrid*=\"Video\"] *, [data-vido] *, [jscontroller=\"rTuANe\"] *))": {
+        "max": 8,
+        "seen": 3,
+        "runs": 3
+      },
+      "[jscontroller=\"rTuANe\"] img": {
+        "max": 48,
+        "seen": 3,
+        "runs": 3
+      },
+      "[jscontroller=\"rTuANe\"] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[jscontroller=\"rTuANe\"] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"Video\"] img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"Video\"] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"Video\"] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "video-voyager img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "video-voyager picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "video-voyager [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-vido] img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-vido] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-vido] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[jsname=\"tX7jT\"] img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[jsname=\"tX7jT\"] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[jsname=\"tX7jT\"] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "a[href*=\"youtube.com/watch\"] img": {
+        "max": 11,
+        "seen": 3,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] :is(:has(> img):not(:has(> :not(img))))": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] g-img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[jscontroller=\"rTuANe\"] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"Video\"] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "video-voyager video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-vido] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[jsname=\"tX7jT\"] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "a[href*=\"youtube.com/watch\"] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      }
+    },
+    "tw-kp": {
+      "g-scrolling-carousel": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "g-img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-tts-text]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "#search img:not(:is(cite img, .VuuXrf img, .byrV5b img, .TbwUpd img, .XNo5Ab, .eqA2re, video-voyager *, [data-attrid*=\"Video\"] *, [data-vido] *, [jscontroller=\"rTuANe\"] *))": {
+        "max": 21,
+        "seen": 3,
+        "runs": 3
+      },
+      "#rcnt img:not(:is(cite img, .VuuXrf img, .byrV5b img, .TbwUpd img, .XNo5Ab, .eqA2re, video-voyager *, [data-attrid*=\"Video\"] *, [data-vido] *, [jscontroller=\"rTuANe\"] *))": {
+        "max": 31,
+        "seen": 3,
+        "runs": 3
+      },
+      "[jscontroller=\"rTuANe\"] img": {
+        "max": 21,
+        "seen": 3,
+        "runs": 3
+      },
+      "[jscontroller=\"rTuANe\"] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[jscontroller=\"rTuANe\"] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"Video\"] img": {
+        "max": 5,
+        "seen": 1,
+        "runs": 3
+      },
+      "div[data-attrid*=\"Video\"] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"Video\"] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "video-voyager img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "video-voyager picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "video-voyager [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-vido] img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-vido] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-vido] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[jsname=\"tX7jT\"] img": {
+        "max": 4,
+        "seen": 3,
+        "runs": 3
+      },
+      "div[jsname=\"tX7jT\"] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[jsname=\"tX7jT\"] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "a[href*=\"youtube.com/watch\"] img": {
+        "max": 7,
+        "seen": 3,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] :is(:has(> img):not(:has(> :not(img))))": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] g-img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[jscontroller=\"rTuANe\"] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"Video\"] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "video-voyager video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-vido] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[jsname=\"tX7jT\"] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "a[href*=\"youtube.com/watch\"] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      }
+    },
+    "com-en-web": {
+      "g-scrolling-carousel": {
+        "max": 1,
+        "seen": 1,
+        "runs": 3
+      },
+      "div[data-attrid*=\"image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "g-img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-tts-text]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "#search img:not(:is(cite img, .VuuXrf img, .byrV5b img, .TbwUpd img, .XNo5Ab, .eqA2re, video-voyager *, [data-attrid*=\"Video\"] *, [data-vido] *, [jscontroller=\"rTuANe\"] *))": {
+        "max": 29,
+        "seen": 3,
+        "runs": 3
+      },
+      "#rcnt img:not(:is(cite img, .VuuXrf img, .byrV5b img, .TbwUpd img, .XNo5Ab, .eqA2re, video-voyager *, [data-attrid*=\"Video\"] *, [data-vido] *, [jscontroller=\"rTuANe\"] *))": {
+        "max": 58,
+        "seen": 3,
+        "runs": 3
+      },
+      "[jscontroller=\"rTuANe\"] img": {
+        "max": 5,
+        "seen": 3,
+        "runs": 3
+      },
+      "[jscontroller=\"rTuANe\"] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[jscontroller=\"rTuANe\"] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"Video\"] img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"Video\"] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"Video\"] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "video-voyager img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "video-voyager picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "video-voyager [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-vido] img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-vido] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-vido] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[jsname=\"tX7jT\"] img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[jsname=\"tX7jT\"] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[jsname=\"tX7jT\"] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "a[href*=\"youtube.com/watch\"] img": {
+        "max": 2,
+        "seen": 3,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] :is(:has(> img):not(:has(> :not(img))))": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] g-img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[jscontroller=\"rTuANe\"] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"Video\"] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "video-voyager video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-vido] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[jsname=\"tX7jT\"] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "a[href*=\"youtube.com/watch\"] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      }
+    },
+    "com-en-images": {
+      "g-scrolling-carousel": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"image\"]": {
+        "max": 100,
+        "seen": 3,
+        "runs": 3
+      },
+      "g-img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-tts-text]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "#search img:not(:is(cite img, .VuuXrf img, .byrV5b img, .TbwUpd img, .XNo5Ab, .eqA2re, video-voyager *, [data-attrid*=\"Video\"] *, [data-vido] *, [jscontroller=\"rTuANe\"] *))": {
+        "max": 211,
+        "seen": 3,
+        "runs": 3
+      },
+      "#rcnt img:not(:is(cite img, .VuuXrf img, .byrV5b img, .TbwUpd img, .XNo5Ab, .eqA2re, video-voyager *, [data-attrid*=\"Video\"] *, [data-vido] *, [jscontroller=\"rTuANe\"] *))": {
+        "max": 211,
+        "seen": 3,
+        "runs": 3
+      },
+      "[jscontroller=\"rTuANe\"] img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[jscontroller=\"rTuANe\"] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[jscontroller=\"rTuANe\"] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"Video\"] img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"Video\"] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"Video\"] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "video-voyager img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "video-voyager picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "video-voyager [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-vido] img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-vido] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-vido] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[jsname=\"tX7jT\"] img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[jsname=\"tX7jT\"] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[jsname=\"tX7jT\"] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "a[href*=\"youtube.com/watch\"] img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] :is(:has(> img):not(:has(> :not(img))))": {
+        "max": 33,
+        "seen": 3,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] img": {
+        "max": 33,
+        "seen": 3,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] g-img": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] picture": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[role=\"list\"] [role=\"listitem\"] a[role=\"link\"][href*=\"/search\"] [style*=\"background-image\"]": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "[jscontroller=\"rTuANe\"] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-attrid*=\"Video\"] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "video-voyager video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[data-vido] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "div[jsname=\"tX7jT\"] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      },
+      "a[href*=\"youtube.com/watch\"] video": {
+        "max": 0,
+        "seen": 0,
+        "runs": 3
+      }
+    }
+  },
+  "roots": {
+    "tw-web": {
+      "#search": true,
+      "#rcnt": true,
+      "#center_col": true
+    },
+    "tw-images": {
+      "#search": true,
+      "#rcnt": true,
+      "#center_col": true
+    },
+    "tw-video": {
+      "#search": true,
+      "#rcnt": true,
+      "#center_col": true
+    },
+    "tw-kp": {
+      "#search": true,
+      "#rcnt": true,
+      "#center_col": true
+    },
+    "com-en-web": {
+      "#search": true,
+      "#rcnt": true,
+      "#center_col": true
+    },
+    "com-en-images": {
+      "#search": true,
+      "#rcnt": true,
+      "#center_col": true
+    }
+  },
+  "autocomplete": {
+    "listbox": 4,
+    "options": 20
+  }
+}

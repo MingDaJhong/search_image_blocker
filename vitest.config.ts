@@ -7,6 +7,6 @@ export default defineConfig({
   plugins: [WxtVitest()],
   test: {
     environment: 'node',
-    include: ['{composables,entrypoints}/**/*.test.ts'],
+    include: ['{composables,entrypoints,canary}/**/*.test.ts'],
   },
 })

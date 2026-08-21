@@ -16,7 +16,11 @@ pnpm zip              # build + zip for store upload
 pnpm compile          # vue-tsc --noEmit (type-check)
 pnpm test             # vitest run — pure-function regression suite
 pnpm test:watch       # vitest in watch mode
+pnpm canary           # 週檢：開真 Chrome 打 Google，比對 selector 命中數基準線
+pnpm canary:update    # 同上，但把這次結果寫成新基準線
 ```
+
+`pnpm canary` **不在 `pnpm test` 裡，也永遠不要放進 CI** —— 見下方「Selector 週檢」。
 
 There is no linter or formatter wired up. The correctness gates are `pnpm compile` and `pnpm test` — run both. Vitest is configured through `vitest.config.ts` using WXT's own `WxtVitest()` plugin, which supplies the `@/` alias and mocks `wxt/browser` with `@webext-core/fake-browser` (importing `wxt/browser` in plain Node throws, since it pulls in `webextension-polyfill`). Tests live next to the code (`composables/*.test.ts`, `entrypoints/content/*.test.ts`). `entrypoints/content/*.test.ts` run under happy-dom (via a `// @vitest-environment happy-dom` pragma) — **not** jsdom, which replaces global `Uint8Array` and breaks esbuild's startup invariant.
 
@@ -213,9 +217,84 @@ GitHub Pages source is `master /(root)`, so the root copy is what Pages picks up
 
 `@/` resolves to the project root (provided by WXT's generated tsconfig). Use `@/composables/...` rather than relative paths.
 
+## Selector 週檢（`canary/`）
+
+`selectors.ts` 是整個專案唯一會因為**別人改東西**而壞掉的檔案，而這個產品沒有
+遙測，所以 Google 改了 DOM 沒有任何自動訊號。`canary/` 就是那個訊號：每週手動
+跑一次，開真的 Chrome 走過 6 個 Google 頁面，逐條數 selector 命中數，和
+`canary/baseline.json` 比對。
+
+- `canary/pages.ts` — 頁面矩陣（純資料）。選頁原則是**每一條還活著的 selector
+  至少被一頁涵蓋**；`g-scrolling-carousel` 只在 `hl=en` 出現、
+  `div[data-attrid*="image"]` 只在圖片分頁出現，少走一頁就會把「還活著」誤判成
+  「早就死了」。
+- `canary/report.ts` — 判定與報表，**純函式、被 `pnpm test` 一起守住**
+  （`canary/report.test.ts`）。
+- `canary/probe.ts` — 序列化後丟進頁面執行的計數函式，不能引用外部變數。
+- `canary/run.canary.ts` — Playwright 驅動，由 `vitest.canary.config.ts` 執行。
+- `canary/README.md` — **給人看的操作手冊**：兩個指令的差別、報告怎麼讀、六種狀態
+  各代表什麼、出現 🔴 時的修復流程。使用者第一次拿到這套工具時看不懂報告，那份
+  文件就是為此存在的 —— 改判定規則或報表格式時要一起更新。
+
+**為什麼一定要真瀏覽器**：排除清單建立在 `:not(:is(cite img, …))` 上，happy-dom
+不支援後代組合子而且是靜默失敗。任何在 happy-dom 裡做的命中數斷言測到的是
+happy-dom，不是這個產品 —— 這也是 `selectors.test.ts` 至今只驗語法不驗命中數的原因。
+
+**為什麼不能上 CI**：GitHub Actions 是資料中心 IP，Google 幾乎必定回驗證碼。這套
+東西的設計前提是「你自己的機器、真實 profile、headed、每週一次」。搬上 CI 不會得到
+自動化報告，只會得到一份每週都是 ⏭ 略過的報告。
+
+**為什麼是比基準線而不是 `expect(count > 0)`**：2026-08-21 的首次盤點顯示，預設開啟
+的 33 條 selector 裡有 23 條在 6 個真實頁面上一次都沒命中過（所有 `picture`、所有
+`<video>`、所有 `[style*="background-image"]`、以及 `video-voyager` / `data-vido`
+兩組舊 fallback）。硬門檻會讓每次執行都亮 23 個紅燈，兩週後就沒人看了。真正有訊息量的
+是**變化**：上週還在命中、這週掉到 0。
+
+**為什麼「歸零」本身還不足以判定失效**（v2 的核心）：第一版就是這樣寫的，同一天第二次
+執行就誤報了 —— `div[data-attrid*="Video"] img`（5 → 0）與 `g-scrolling-carousel`
+（1 → 0）掉到 0，但 selector 一個字都沒改。原因是 **Google 不保證同一個查詢每次都顯示
+同一組模組**：知識面板的影片區、圖片輪播是否出現，隔十五分鐘就會不一樣。兩格都只在
+一個頁面出現過、命中數各只有 5 和 1，用單次觀測當基準線必然誤報。
+
+所以基準線的每一格記的是**觀測史** `{ max, seen, runs }`，不是「上次幾個」。一格要能
+硬性判定失效，得先夠可信（`report.ts` 的 `isTrustworthy`）：穩定度 `seen/runs` 達
+`STABLE_RATIO`(0.8)，**而且** `max >= HIGH_CONFIDENCE_MIN`(10) 或
+`runs >= MIN_RUNS_FOR_HARD_FAIL`(3)。不夠可信的一格歸零只報 `flaky`（🟠），不讓指令
+失敗。`#search img` 從 212 掉到 0 立刻紅燈；`g-scrolling-carousel` 從 1 掉到 0 要先
+累積三次穩定觀測。代價是新的一格要跑幾次 `canary:update` 才開始把關 —— 那是誠實的，
+只觀測過一次的東西本來就還不知道它穩不穩定。
+
+其他幾個不明顯但load-bearing的點：
+- 判定是**逐格（page × selector）**而不是看總數。總數 >0 只證明「還有東西在擋」；
+  一條 selector 靜默失效而其他還命中，只有逐格看得到 —— 那正是 Known gaps 裡
+  「partial breakage」那一條。
+- 被驗證碼擋下的頁面進 `skipped`，**不參與判定，也不併進觀測史**。「沒問到」不是證據；
+  算成一次「沒命中」會讓穩定度被驗證碼稀釋掉，最後把真的穩定的一格降級成 flaky。
+- **只有 `canary:update` 會累積觀測史，`pnpm canary` 是唯讀的。** 如果每次執行都自動
+  累積，一個真的壞掉的 selector 會因為連續幾週都是 0 而讓 `seen/runs` 一路降到門檻
+  以下，然後自己變成 `dead` 不再報警 —— 那正是「靜默把機制關掉」的失敗模式。跑 update
+  等於你看過報告、確認這次是正常的。
+- 基準線是 v2 格式；`migrateBaseline()` 把舊的 v1（只有 counts）讀成 `runs: 1`，也就是
+  「還不夠格硬性判定失效」。
+- 全部頁面都被擋時**不寫基準線**。一份全空的基準線會讓下一次執行把所有東西判成
+  `new`，等於靜默把這套機制關掉。
+- 基準線用 `DEFAULT_SETTINGS.blockTypes`，不是全開 —— `relatedQuestions` /
+  `knowledgePanel` 預設關閉，它們壞掉不影響任何沒改設定的使用者，放進來只會稀釋
+  紅燈的嚴重性。代價是那 7 條沒有週檢覆蓋。
+- `vitest.canary.config.ts` 的 `disableConsoleIntercept: true` 是必要的：vitest 預設
+  不印**通過**的測試的 console 輸出，而這支測試的產出就是那份報告，斷言只是附帶的紅綠燈。
+- 每頁之間有隨機 jitter，並且會捲動一趟再回頂讓 lazy-load 縮圖進來。不捲的話命中數
+  隨視窗高度浮動，基準線就變成噪音（首次手動盤點就因為沒捲，把 `div[jsname="tX7jT"]`
+  和 `div[data-attrid*="Video"]` 誤判成已死）。
+
+`.canary-profile/` 是複製出來的 Chrome profile（gitignore），留著 consent cookie。
+第一次跑如果卡在 consent 畫面，用那個 profile 手動開一次 Google 通過即可。
+
 ## Known gaps
 
-- Google CSS selectors in `entrypoints/content/selectors.ts` need ongoing maintenance as Google rotates its DOM. The dev-only `devSelectorAudit`, the on-page indicator's "hidden 0 blocks" state, and the popup's diagnosis button all surface a *full* rotation; partial breakage (one selector silently failing while others still match something) still won't trigger anything.
+- Google CSS selectors in `entrypoints/content/selectors.ts` need ongoing maintenance as Google rotates its DOM. The dev-only `devSelectorAudit`, the on-page indicator's "hidden 0 blocks" state, and the popup's diagnosis button all surface a *full* rotation. Partial breakage is now covered by `pnpm canary` (逐格比對，見上方「Selector 週檢」) — **但那是手動每週跑的，不是自動的**：真正壞掉到你發現之間仍有最多一週的空窗。
+- 週檢只涵蓋 `DEFAULT_SETTINGS.blockTypes`（33 條）。`relatedQuestions` / `knowledgePanel` 的 7 條預設關閉、沒有基準線，壞了不會有人知道。
+- 首次盤點（2026-08-21）顯示 33 條裡只有 10 條實際命中過任何東西。剩下 23 條沒有刪 —— 它們是防禦性的舊 layout fallback，成本只有幾百 bytes 的 CSS 文字 —— 但「加一條 selector」和「這條 selector 真的有用」是兩回事，新增時值得先用 canary 確認。
 - **`blur` / `mask` have only been verified against synthetic fixtures rendered in a real CSS engine, never on a live Google SERP.** The visual claims hold (flat tile with no silhouette, no blur bleed), but how they read on an actual results page — and whether click-to-reveal survives Google's `jsaction` handlers in practice — is unverified. All three constants (`BLUR_RADIUS_PX`, `BLUR_CONTRAST`, `BLUR_BRIGHTNESS`) are tunable knobs in `hideStyle.ts`.
 - **A6's soft-navigation path is untested against real Google.** Whether udm-tab / filter-chip switches actually go through `pushState` differs by Google version; the 500 ms poll makes the watcher correct either way, but if soft navigation never happens the whole module is dead weight.
 - `blur` / `mask` let the images download. That is inherent to keeping them in the layout, and the popup hint says so, but it means those modes are strictly worse than `hide` for bandwidth and for anything that watches network activity.

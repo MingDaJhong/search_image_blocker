@@ -9,3 +9,8 @@ stats-*.json
 .DS_Store
 .claude
 assets/icons-source/
+
+# canary 週檢：複製出來的 Chrome profile（含 cookie），不進版控
+.canary-profile/
+.selectors-dump.json
+.canary-probe.js

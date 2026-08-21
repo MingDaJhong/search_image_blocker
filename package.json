@@ -13,6 +13,8 @@
     "zip:firefox": "wxt zip -b firefox",
     "compile": "vue-tsc --noEmit",
     "test": "vitest run",
+    "canary": "vitest run --config vitest.canary.config.ts",
+    "canary:update": "CANARY_UPDATE=1 vitest run --config vitest.canary.config.ts",
     "test:watch": "vitest",
     "sync:privacy": "cp entrypoints/privacy/index.html privacy.html",
     "postinstall": "wxt prepare"
@@ -28,6 +30,7 @@
     "@wxt-dev/module-vue": "^1.0.3",
     "autoprefixer": "^10.5.0",
     "happy-dom": "^20.11.6",
+    "playwright-core": "^1.62.1",
     "postcss": "^8.5.13",
     "tailwindcss": "^3.4.19",
     "typescript": "^5.9.3",
