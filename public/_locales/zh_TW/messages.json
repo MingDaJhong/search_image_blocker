@@ -4,7 +4,7 @@
     "description": "Extension display name"
   },
   "extDescription": {
-    "message": "依關鍵字隱藏 Google 搜尋頁的圖片、影片與知識面板等視覺干擾。零資料蒐集。",
+    "message": "依關鍵字隱藏 Google 搜尋的圖片與影片；搜尋字沒命中時也會逐筆比對結果內容。零資料蒐集。",
     "description": "Extension short description shown in Chrome Web Store and chrome://extensions"
   },
   "cmdToggleReveal": {
