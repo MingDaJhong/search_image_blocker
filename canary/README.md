@@ -58,13 +58,13 @@ pnpm canary:update   # 3. 告訴它「這次正常」
 ## 報告怎麼看
 
 ```
-Google SERP selector 週檢 — 2026-08-21（基準線累積 2 次觀測）   ← ①
+Google SERP selector 週檢 — 2026-09-04（基準線累積 5 次觀測）   ← ①
 
-🟠 flaky (2) — 歸零，但觀測史還不足以排除「Google 這次沒顯示那個模組」   ← ②
-    [tw-kp] div[data-attrid*="Video"] img
-        過去 1/2 次命中，最多 5 → 這次 0                        ← ③
+🟠 flaky (1) — 歸零，但觀測史還不足以排除「Google 這次沒顯示那個模組」   ← ②
+    [com-en-web] g-scrolling-carousel
+        過去 1/5 次命中，最多 1 → 這次 0                        ← ③
 
-合計 198 格：28 正常 · 0 失效 · 2 待確認 · 1 下滑 · 167 長期未命中  ← ④
+合計 186 格：23 正常 · 0 失效 · 1 待確認 · 0 下滑 · 158 長期未命中  ← ④
   掃描根：#search / #rcnt / #center_col 在 6 頁全部存在           ← ⑤
   autocomplete：listbox 4 · option 20                            ← ⑥
 ```
@@ -76,10 +76,11 @@ Google SERP selector 週檢 — 2026-08-21（基準線累積 2 次觀測）   �
 **② 分類標題** — 只有需要你注意的類別才會出現。全部正常時這一段是空的。
 
 **③ 每一格的觀測史** — 讀法是
-「這個 selector 在 `tw-kp` 這一頁，過去 2 次檢查裡有 1 次 match 到東西，
-最多曾經 match 到 5 個，而這次 match 到 0 個」。
+「這個 selector 在 `com-en-web` 這一頁，過去 5 次檢查裡有 1 次 match 到東西，
+最多曾經 match 到 1 個，而這次 match 到 0 個」。
 
-**④ 合計** — 「格」= 一個頁面 × 一條 selector。6 頁 × 33 條 = 198 格。
+**④ 合計** — 「格」= 一個頁面 × 一條 selector。6 頁 × 31 條 = 186 格。
+（條數會隨 `selectors.ts` 增減而變，數字對不上時以實際報告為準。）
 
 **⑤ 掃描根** — 逐筆結果比對（`resultScanner`）要靠這三個容器找結果區。
 三個都不見的話那個功能整個失效。
@@ -98,7 +99,7 @@ Google SERP selector 週檢 — 2026-08-21（基準線累積 2 次觀測）   �
 | 🆕 | `new` | 基準線沒有這一格（你新增了 selector 或新增了頁面） | 跑 `canary:update` 收進來 |
 | ⚪ | `dead` | **從來沒命中過。** 不是這次壞的 | 什麼都不用做。預設摺疊成一行 |
 
-> ⚪ 有 167 格是正常的。首次盤點發現 33 條 selector 裡有 23 條從來沒 match 到任何東西
+> ⚪ 有 158 格是正常的。31 條 selector 裡有 23 條從來沒 match 到任何東西
 > （舊版 layout 的防禦性 fallback、`<picture>`、`<video>` 等）。
 > 它們沒有被刪掉，成本只有幾百 bytes 的 CSS 文字。
 > 想看是哪些：`CANARY_DEAD=1 pnpm canary`

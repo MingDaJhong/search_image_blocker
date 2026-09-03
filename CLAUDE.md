@@ -302,8 +302,10 @@ happy-dom，不是這個產品 —— 這也是 `selectors.test.ts` 至今只驗
 ## Known gaps
 
 - Google CSS selectors in `entrypoints/content/selectors.ts` need ongoing maintenance as Google rotates its DOM. The dev-only `devSelectorAudit`, the on-page indicator's "hidden 0 blocks" state, and the popup's diagnosis button all surface a *full* rotation. Partial breakage is now covered by `pnpm canary` (逐格比對，見上方「Selector 週檢」) — **但那是手動每週跑的，不是自動的**：真正壞掉到你發現之間仍有最多一週的空窗。
-- 週檢只涵蓋 `DEFAULT_SETTINGS.blockTypes`（33 條）。`relatedQuestions` / `knowledgePanel` 的 7 條預設關閉、沒有基準線，壞了不會有人知道。
-- 首次盤點（2026-08-21）顯示 33 條裡只有 10 條實際命中過任何東西。剩下 23 條沒有刪 —— 它們是防禦性的舊 layout fallback，成本只有幾百 bytes 的 CSS 文字 —— 但「加一條 selector」和「這條 selector 真的有用」是兩回事，新增時值得先用 canary 確認。
+- 週檢只涵蓋 `DEFAULT_SETTINGS.blockTypes`（31 條）。`relatedQuestions` / `knowledgePanel` 的 7 條預設關閉、沒有基準線，壞了不會有人知道。
+- 累積 5 次觀測後，31 條裡只有 8 條實際命中過任何東西。剩下 23 條沒有刪 —— 它們是防禦性的舊 layout fallback，成本只有幾百 bytes 的 CSS 文字 —— 但「加一條 selector」和「這條 selector 真的有用」是兩回事，新增時值得先用 canary 確認（`div[data-surl]` 就是這樣進來的：先實測到命中，才寫進 `VIDEO_CARD_CONTAINERS`）。
+- **`videos` 這一組實質上只剩兩條在撐**：`video-voyager` / `[data-vido]` 五次觀測從未命中，`[data-attrid*="Video"]` 只在 tw-kp 出現過 3/5 次。真正在擋的是 `[jscontroller="rTuANe"]`（混淆 hash，隨時可能輪替）與 2026-09-04 補上的 `div[data-surl]`（語意屬性，較穩定但目前獨立貢獻為 0）。兩條同時失效就等於 videos 整組失效。
+- **任何 `a[href*="<某網站>"]` 形式的 selector 都已經不可能命中**：2026-09-04 起 Google 把所有外連換成不透明轉址 `/goto?url=<token>`，`ping` 屬性帶的也是同一組 token，舊的 `/url?q=` 歸零。目的地只剩影片卡的 `data-surl` / `data-curl` / `data-pubr` 帶得到。
 - **`blur` / `mask` have only been verified against synthetic fixtures rendered in a real CSS engine, never on a live Google SERP.** The visual claims hold (flat tile with no silhouette, no blur bleed), but how they read on an actual results page — and whether click-to-reveal survives Google's `jsaction` handlers in practice — is unverified. All three constants (`BLUR_RADIUS_PX`, `BLUR_CONTRAST`, `BLUR_BRIGHTNESS`) are tunable knobs in `hideStyle.ts`.
 - **A6's soft-navigation path is untested against real Google.** Whether udm-tab / filter-chip switches actually go through `pushState` differs by Google version; the 500 ms poll makes the watcher correct either way, but if soft navigation never happens the whole module is dead weight.
 - `blur` / `mask` let the images download. That is inherent to keeping them in the layout, and the popup hint says so, but it means those modes are strictly worse than `hide` for bandwidth and for anything that watches network activity.

@@ -55,17 +55,29 @@ export const INITIAL_HIDE_BLOCK_TYPES: BlocklistSettings["blockTypes"] = {
 /**
  * 影片卡容器辨識：
  *   [jscontroller="rTuANe"]  — 知識面板影片 + 主搜尋結果區影片區「都」用這個 controller
+ *   div[data-surl]           — 影片結果卡上的來源網址（見下方 2026-09-04 的說明）
  *   [data-attrid*="Video"]   — 知識面板的 VisualDigestVideoResult / 舊版 VideoObject
  *   video-voyager / [data-vido] — 舊版 layout 的 fallback
  *
- * `div[jsname="tX7jT"]` 曾在這裡，2026-08-21 的週檢抓到它歸零後移除：真頁面
- * （`q=貓`）上那個容器一個都不存在，但同一頁的影片區塊還在，而且已經被上面
- * 前兩條命中（rTuANe 10 張圖、data-attrid 5 張）。也就是 Google 換掉了容器名、
- * 被擋的東西沒變少 —— 留著只會讓每週週檢固定亮一盞紅燈。要補回來之前，先用
- * canary 確認它真的還會命中。
+ * `div[data-surl]` 是 2026-09-04 補上的，動機是**其他三條實際上都已經死了**：
+ * 週檢五次觀測裡 `video-voyager` 與 `[data-vido]` 從未命中，`[data-attrid*="Video"]`
+ * 只在 tw-kp 出現過 3/5 次。也就是整個 videos 阻擋只剩 `rTuANe` 一條在撐，而那是
+ * 一串混淆過的 hash，Google 換掉它的那一天這個功能會整組失效。
+ * `data-surl` / `data-curl`（來源網址）與 `data-pubr`（來源站名，如 "YouTube"）是
+ * 語意屬性，比 hash 穩定。實測 tw-web 17、tw-video 60、tw-kp 4、com-en-web 5 命中，
+ * 是**已驗證還活著**的一條，不是又一個防禦性猜測。
+ *
+ * 它目前的獨立貢獻是 0（帶 data-surl 的 div 就長在 rTuANe 卡片裡面），刻意保留 ——
+ * 這條的價值是在 rTuANe 輪替時接手，不是現在多擋到什麼。
+ *
+ * 兩條已移除的紀錄，補回來之前請先用 canary 確認它們真的還會命中：
+ *   - `div[jsname="tX7jT"]`：2026-08-21 週檢抓到歸零。容器改名了，被擋的東西沒變少。
+ *   - `a[href*="youtube.com/watch"]`：2026-09-04 週檢抓到六頁同時歸零，原因見
+ *     `collectBlockSelectors` 裡的說明 —— href 已經不再帶得到目的地。
  */
 const VIDEO_CARD_CONTAINERS = [
   '[jscontroller="rTuANe"]',
+  "div[data-surl]",
   'div[data-attrid*="Video"]',
   "video-voyager",
   "div[data-vido]",
@@ -84,10 +96,7 @@ export function collectAlwaysHideSelectors(
   blockTypes: BlocklistSettings["blockTypes"],
 ): string[] {
   if (!blockTypes.videos) return [];
-  return [
-    ...VIDEO_CARD_CONTAINERS.map((card) => `${card} video`),
-    'a[href*="youtube.com/watch"] video',
-  ];
+  return VIDEO_CARD_CONTAINERS.map((card) => `${card} video`);
 }
 
 /**
@@ -120,6 +129,19 @@ export function collectBlockSelectors(
   if (blockTypes.videos) {
     // 只擋影片卡內部的「預覽圖 + 背景影像」，不擋整張卡，保留文字標題/來源/日期。
     // `<video>` 本身走 collectAlwaysHideSelectors()，理由見那裡。
+    //
+    // 這裡曾經還有一條 `a[href*="youtube.com/watch"] img`。2026-09-04 的週檢六頁
+    // 同時歸零，實地確認後移除：Google 把**所有**外連換成不透明轉址
+    // `/goto?url=<token>`（實測 com-en-web 190 個 anchor 裡 75 個是它，舊的
+    // `/url?q=` 剩 0 個），`ping` 屬性帶的也是同一組 token。也就是
+    // **anchor 的 href 已經不再帶得到目的地網址**，任何 `a[href*="<某網站>"]`
+    // 形式的 selector 從此都不可能命中 —— 不要再往這個方向寫。
+    //
+    // 目的地本身沒有消失，只是搬到影片卡的 `data-surl` / `data-curl` 上了
+    // （`data-pubr` 則是站名），所以改由 VIDEO_CARD_CONTAINERS 的 `div[data-surl]`
+    // 接手。移除前實測過那 17 / 60 / 4 / 5 個 YouTube 縮圖在五個頁面上的
+    // 獨立貢獻都是 0，也就是它們早就被 rTuANe 與 `#search img` 同時涵蓋著，
+    // 這次移除沒有讓任何一張圖漏掉。
     for (const card of VIDEO_CARD_CONTAINERS) {
       selectors.push(
         `${card} img`,
@@ -127,7 +149,6 @@ export function collectBlockSelectors(
         `${card} [style*="background-image"]`,
       );
     }
-    selectors.push('a[href*="youtube.com/watch"] img');
   }
 
   if (blockTypes.imageFilterBar) {
