@@ -21,7 +21,7 @@ export default defineConfig({
     default_locale: 'zh_TW',
     name: '__MSG_extName__',
     description: '__MSG_extDescription__',
-    version: '1.1.0',
+    version: '1.1.1',
     permissions: ['storage'],
     host_permissions: GOOGLE_HOST_PERMISSIONS,
     action: {
