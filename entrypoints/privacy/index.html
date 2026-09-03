@@ -88,6 +88,12 @@
       <code>chrome.storage.sync</code>，由 Google 跨您已登入的 Chrome 裝置同步，
       不經過本擴充功能的伺服器。
     </p>
+    <p>
+      為了讓設定視窗一打開就顯示內容，本擴充功能另外在自己的
+      <code>localStorage</code> 保留一份設定副本。這份副本只存在於這台裝置、
+      只有本擴充功能自己的頁面讀得到，您造訪的網站（包含 Google）無法存取，
+      也不會被傳送到任何地方。移除本擴充功能時會一併刪除。
+    </p>
 
     <h2>我們如何使用資料？</h2>
     <p>
@@ -138,6 +144,14 @@
       <code>chrome.storage.sync</code>, which Google syncs across your signed-in
       Chrome devices. This sync is handled entirely by Google and does not pass
       through any server operated by this extension.
+    </p>
+    <p>
+      So that the settings window shows its contents the moment it opens, the
+      extension also keeps a copy of your settings in its own
+      <code>localStorage</code>. That copy stays on this device, is readable only
+      by the extension's own pages — never by the websites you visit, Google
+      included — and is never transmitted anywhere. Uninstalling the extension
+      deletes it.
     </p>
 
     <h2>How do we use data?</h2>

@@ -108,27 +108,34 @@ function isSearchUrl(href: string): boolean {
   }
 }
 
-watch(loaded, async (isLoaded) => {
-  if (!isLoaded) return;
-  refreshStorageUsage();
-  loadShortcuts();
-  // 截圖模式：popup 以分頁開啟並帶 ?q=<關鍵字> 時，跳過 tabs API
-  // 直接把該關鍵字當成「目前搜尋字串」，方便擷取阻擋 banner 畫面。
-  const overrideQ = new URL(location.href).searchParams.get("q");
-  if (overrideQ !== null) {
-    currentSearchQuery.value = overrideQ;
-    return;
-  }
-  try {
-    const tab = await findSearchTab();
-    if (!tab?.url) return;
-    currentSearchQuery.value = new URL(tab.url).searchParams.get("q") ?? "";
-  } catch {
-    // tabs API 不可用或 URL 無法存取
-  }
-  // 狀態卡要顯示「已隱藏幾個」，那個數字只有 content script 知道
-  applyReport(await fetchReport());
-});
+// immediate 是必要的：useBlockList 命中本機快取時 `loaded` 一開始就是 true，
+// 沒有 immediate 這個 watcher 永遠等不到那次 false → true 的轉換，狀態卡與
+// 儲存配額就會整個不初始化。傳進來是 false 時第一行會自己 early-return。
+watch(
+  loaded,
+  async (isLoaded) => {
+    if (!isLoaded) return;
+    refreshStorageUsage();
+    loadShortcuts();
+    // 截圖模式：popup 以分頁開啟並帶 ?q=<關鍵字> 時，跳過 tabs API
+    // 直接把該關鍵字當成「目前搜尋字串」，方便擷取阻擋 banner 畫面。
+    const overrideQ = new URL(location.href).searchParams.get("q");
+    if (overrideQ !== null) {
+      currentSearchQuery.value = overrideQ;
+      return;
+    }
+    try {
+      const tab = await findSearchTab();
+      if (!tab?.url) return;
+      currentSearchQuery.value = new URL(tab.url).searchParams.get("q") ?? "";
+    } catch {
+      // tabs API 不可用或 URL 無法存取
+    }
+    // 狀態卡要顯示「已隱藏幾個」，那個數字只有 content script 知道
+    applyReport(await fetchReport());
+  },
+  { immediate: true },
+);
 
 /**
  * Popup 只有一個視窗，靠這個狀態決定顯示哪一頁。
@@ -534,7 +541,26 @@ const showHeaderMenu = ref(false);
 
 // 儲存配額
 const STORAGE_QUOTA = 102400; // chrome.storage.sync.QUOTA_BYTES = 100 KB
-const storageBytes = ref(0);
+/**
+ * 上次量到的 storage 用量。
+ *
+ * 先用本機快取開場再對帳，理由跟 useBlockList 的設定快取一樣：
+ * `getBytesInUse` 是 async，等它回來才渲染的話這段配額列會在畫面上憑空長出來，
+ * 使用者看到的就是「開啟後又跳了一下」。數字對不對隨後會自己修正，但版面
+ * 從第一個 frame 起就是穩定的。
+ */
+const STORAGE_BYTES_CACHE_KEY = "sib_storage_bytes";
+
+function readStorageBytesCache(): number {
+  try {
+    const n = Number(localStorage.getItem(STORAGE_BYTES_CACHE_KEY));
+    return Number.isFinite(n) && n > 0 ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+
+const storageBytes = ref(readStorageBytesCache());
 const storageKB = computed(() => (storageBytes.value / 1024).toFixed(1));
 const storagePercent = computed(() =>
   Math.min(100, Math.round((storageBytes.value / STORAGE_QUOTA) * 100)),
@@ -550,6 +576,11 @@ async function refreshStorageUsage() {
   try {
     const bytes = await browser.storage.sync.getBytesInUse(STORAGE_KEY);
     storageBytes.value = bytes;
+    try {
+      localStorage.setItem(STORAGE_BYTES_CACHE_KEY, String(bytes));
+    } catch {
+      // 隱私模式或配額爆掉；快取失敗只是下次少一格穩定版面，不影響功能
+    }
   } catch {
     // Firefox 或 API 不支援時靜默忽略
   }
@@ -867,9 +898,17 @@ function cancelImport() {
       </h1>
     </header>
 
+    <!--
+      只有「這台裝置第一次開」會走到這裡（之後都有本機快取，第一個 frame 就是
+      完整畫面）。min-h 是為了那一次：Chrome 是照內容高度決定 popup 視窗大小的，
+      不撐開的話視窗會先開成一條，再猛然長到滿版。
+    -->
     <div
       v-if="!loaded"
-      class="text-center text-sm text-gray-400 dark:text-gray-500 py-8"
+      :class="[
+        'text-center text-sm text-gray-400 dark:text-gray-500 py-8',
+        props.wide ? '' : 'min-h-[420px]',
+      ]"
     >
       {{ t.loading }}
     </div>

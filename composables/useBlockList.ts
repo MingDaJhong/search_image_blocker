@@ -136,21 +136,85 @@ export const PRESET_TEMPLATES: DefaultCategory[] = [
 /**
  * Vue composable：響應式設定 + 自動儲存
  */
+/**
+ * popup / 設定頁專用的同步快取 key。
+ *
+ * **只在擴充功能自己的 origin 用**，絕對不要搬進 blockList.ts —— content script
+ * 跑在 google.com 的 origin 裡，在那邊寫 localStorage 等於把使用者的關鍵字清單
+ * 交給 Google 的網頁腳本讀。
+ */
+const SETTINGS_CACHE_KEY = 'sib_settings_cache'
+
+/**
+ * 同步讀回上一次的設定，讀不到或壞掉回傳 null。
+ *
+ * 存在的理由是「開啟 popup 會空一下」：`chrome.storage.sync` 只有 async API，
+ * 而它在 profile 剛醒來或正在跟 Google 同步時可以花上幾百毫秒。那段時間裡
+ * 唯一能畫的只有「載入中…」，然後整個 UI 才一次長出來 —— 使用者看到的就是
+ * 一次閃動加一次視窗長高。localStorage 是同步的，所以第一個 frame 就能畫出
+ * 真正的內容，storage 回來之後只是靜靜地對帳。
+ *
+ * 快取走的是與 storage 讀取、匯入檔案同一套 `normalizeSettings`：快取檔可能是
+ * 舊版本寫的，缺欄位要能自己補齊，而不是把 undefined 交給 UI。
+ */
+function readSettingsCache(): BlocklistSettings | null {
+  try {
+    const raw = localStorage.getItem(SETTINGS_CACHE_KEY)
+    if (!raw) return null
+    const data = JSON.parse(raw) as unknown
+    if (!data || typeof data !== 'object') return null
+    return normalizeSettings(data as Record<string, unknown>)
+  } catch {
+    // localStorage 被停用、或快取內容壞掉 —— 退回原本的 async 路徑就好
+    return null
+  }
+}
+
+function writeSettingsCache(json: string) {
+  try {
+    localStorage.setItem(SETTINGS_CACHE_KEY, json)
+  } catch {
+    // 配額或隱私模式；快取失敗不該影響真正的儲存
+  }
+}
+
 export function useBlockList() {
-  const settings = ref<BlocklistSettings>({
-    ...DEFAULT_SETTINGS,
-    blockTypes: { ...DEFAULT_SETTINGS.blockTypes },
-    keywords: [...DEFAULT_SETTINGS.keywords],
-    allowKeywords: [...DEFAULT_SETTINGS.allowKeywords],
-    enabledCategories: [...DEFAULT_SETTINGS.enabledCategories],
-    categoryOrder: [],
-    customCategories: [],
-  })
-  const loaded = ref(false)
+  // 有快取就直接以它開場，第一個 paint 就是完整畫面；沒有才落回預設值。
+  const cached = readSettingsCache()
+  const settings = ref<BlocklistSettings>(
+    cached ?? {
+      ...DEFAULT_SETTINGS,
+      blockTypes: { ...DEFAULT_SETTINGS.blockTypes },
+      keywords: [...DEFAULT_SETTINGS.keywords],
+      allowKeywords: [...DEFAULT_SETTINGS.allowKeywords],
+      enabledCategories: [...DEFAULT_SETTINGS.enabledCategories],
+      categoryOrder: [],
+      customCategories: [],
+    },
+  )
+  // 快取命中就等於「有東西可以畫」，UI 不必再等 storage 回來。
+  const loaded = ref(cached !== null)
   const saveError = ref(false)
 
+  /**
+   * 目前已經寫進 storage / 快取的序列化內容。
+   *
+   * 拿它比對而不是靠一個「現在正在套用遠端資料」的旗標：`settings.value = s`
+   * 會同步觸發下面那個 sync watcher，若不擋掉，每次開 popup 都會把剛讀回來的
+   * 東西原封不動寫回去一次 —— `chrome.storage.sync` 有每小時 1800 次的寫入
+   * 上限，把它花在「什麼都沒改」上面很不值得。用內容比對還順手擋掉「勾了又
+   * 取消勾」這類回到原狀的操作。
+   */
+  let lastPersisted = cached ? JSON.stringify(cached) : ''
+
   loadSettings().then((s) => {
-    settings.value = s
+    const json = JSON.stringify(s)
+    // 跟快取一模一樣就不要動 settings.value —— 省掉一次整棵樹的重繪。
+    if (json !== lastPersisted) {
+      lastPersisted = json
+      settings.value = s
+      writeSettingsCache(json)
+    }
     loaded.value = true
   })
 
@@ -158,6 +222,10 @@ export function useBlockList() {
     settings,
     (val) => {
       if (!loaded.value) return
+      const json = JSON.stringify(val)
+      if (json === lastPersisted) return
+      lastPersisted = json
+      writeSettingsCache(json)
       saveSettings(val).then((ok) => {
         saveError.value = !ok
       })
@@ -298,49 +366,60 @@ export function parseImport(jsonStr: string): BlocklistSettings | null {
         : data
     ) as Record<string, unknown>
 
-    const locale: Locale =
-      raw.locale === 'zh-TW' || raw.locale === 'en' ? raw.locale : detectDefaultLocale()
-
-    let categories = normalizeCategories(raw.customCategories)
-    if (categories.length === 0) {
-      categories = seedDefaultCategories(locale)
-    }
-    const categoryIds = categories.map((c) => c.id)
-    const enabledCategories = Array.isArray(raw.enabledCategories)
-      ? (raw.enabledCategories as unknown[]).filter((id): id is string => typeof id === 'string')
-      : [...DEFAULT_SETTINGS.enabledCategories]
-
-    return {
-      paused: typeof raw.paused === 'boolean' ? raw.paused : false,
-      globalBlock: typeof raw.globalBlock === 'boolean' ? raw.globalBlock : DEFAULT_SETTINGS.globalBlock,
-      hideMode: normalizeHideMode(raw.hideMode),
-      blockTypes: {
-        ...DEFAULT_SETTINGS.blockTypes,
-        ...(raw.blockTypes && typeof raw.blockTypes === 'object'
-          ? (raw.blockTypes as Partial<BlocklistSettings['blockTypes']>)
-          : {}),
-      },
-      keywords: Array.isArray(raw.keywords)
-        ? (raw.keywords as unknown[]).filter(isValidKeyword)
-        : [...DEFAULT_SETTINGS.keywords],
-      // 與 loadSettings 同一套遷移規則：舊版備份檔沒有這個欄位 → 帶入內建例外
-      allowKeywords: Array.isArray(raw.allowKeywords)
-        ? (raw.allowKeywords as unknown[]).filter(isValidKeyword)
-        : seedDefaultAllowKeywords(locale),
-      enabledCategories,
-      categoryOrder: normalizeCategoryOrder(raw.categoryOrder, categoryIds),
-      customCategories: categories,
-      perResultBlock:
-        typeof raw.perResultBlock === 'boolean'
-          ? raw.perResultBlock
-          : DEFAULT_SETTINGS.perResultBlock,
-      pageIndicator:
-        typeof raw.pageIndicator === 'boolean' ? raw.pageIndicator : DEFAULT_SETTINGS.pageIndicator,
-      locale,
-      theme: raw.theme === 'light' || raw.theme === 'dark' ? raw.theme : detectDefaultTheme(),
-    }
+    return normalizeSettings(raw)
   } catch {
     return null
+  }
+}
+
+/**
+ * 把任意來源的 raw 物件正規化成完整的 BlocklistSettings。
+ *
+ * 與 `loadSettings` 裡那一套型別守衛規則相同，抽出來是因為現在有三個入口
+ * 需要它：storage 讀取、匯入檔案、以及 popup 的本機快取。三份實作只要漂移
+ * 一次，就會出現「匯入進來的設定通過檢查、快取讀回來的沒有」這種難查的分歧。
+ */
+function normalizeSettings(raw: Record<string, unknown>): BlocklistSettings {
+  const locale: Locale =
+    raw.locale === 'zh-TW' || raw.locale === 'en' ? raw.locale : detectDefaultLocale()
+
+  let categories = normalizeCategories(raw.customCategories)
+  if (categories.length === 0) {
+    categories = seedDefaultCategories(locale)
+  }
+  const categoryIds = categories.map((c) => c.id)
+  const enabledCategories = Array.isArray(raw.enabledCategories)
+    ? (raw.enabledCategories as unknown[]).filter((id): id is string => typeof id === 'string')
+    : [...DEFAULT_SETTINGS.enabledCategories]
+
+  return {
+    paused: typeof raw.paused === 'boolean' ? raw.paused : false,
+    globalBlock: typeof raw.globalBlock === 'boolean' ? raw.globalBlock : DEFAULT_SETTINGS.globalBlock,
+    hideMode: normalizeHideMode(raw.hideMode),
+    blockTypes: {
+      ...DEFAULT_SETTINGS.blockTypes,
+      ...(raw.blockTypes && typeof raw.blockTypes === 'object'
+        ? (raw.blockTypes as Partial<BlocklistSettings['blockTypes']>)
+        : {}),
+    },
+    keywords: Array.isArray(raw.keywords)
+      ? (raw.keywords as unknown[]).filter(isValidKeyword)
+      : [...DEFAULT_SETTINGS.keywords],
+    // 與 loadSettings 同一套遷移規則：舊版備份檔沒有這個欄位 → 帶入內建例外
+    allowKeywords: Array.isArray(raw.allowKeywords)
+      ? (raw.allowKeywords as unknown[]).filter(isValidKeyword)
+      : seedDefaultAllowKeywords(locale),
+    enabledCategories,
+    categoryOrder: normalizeCategoryOrder(raw.categoryOrder, categoryIds),
+    customCategories: categories,
+    perResultBlock:
+      typeof raw.perResultBlock === 'boolean'
+        ? raw.perResultBlock
+        : DEFAULT_SETTINGS.perResultBlock,
+    pageIndicator:
+      typeof raw.pageIndicator === 'boolean' ? raw.pageIndicator : DEFAULT_SETTINGS.pageIndicator,
+    locale,
+    theme: raw.theme === 'light' || raw.theme === 'dark' ? raw.theme : detectDefaultTheme(),
   }
 }
 
